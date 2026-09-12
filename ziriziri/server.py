@@ -21,6 +21,13 @@ from ziriziri.renderer import (
 
 app = FastAPI(title="ZiriZiriDTP Web Server")
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"サーバー内部エラーが発生しました: {str(exc)}"}
+    )
+
 # Serve static directory
 if not STATIC_DIR.exists():
     STATIC_DIR.mkdir(parents=True, exist_ok=True)
@@ -120,7 +127,10 @@ async def print_todo(req: TodoRequest):
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to print. Ensure printer is turned on.")
+        raise HTTPException(
+            status_code=503,
+            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
+        )
     return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
 
 
@@ -156,7 +166,10 @@ async def print_text(req: TextRequest):
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to print. Ensure printer is turned on.")
+        raise HTTPException(
+            status_code=503,
+            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
+        )
     return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
 
 
@@ -208,7 +221,10 @@ async def print_image_upload(
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=density, feed_after=feed)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to print image.")
+        raise HTTPException(
+            status_code=503,
+            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
+        )
     return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
 
 
@@ -237,6 +253,9 @@ async def print_test_chart(req: TestChartRequest):
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:
-        raise HTTPException(status_code=500, detail="Failed to print test chart.")
+        raise HTTPException(
+            status_code=503,
+            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
+        )
     return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
 

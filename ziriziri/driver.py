@@ -34,24 +34,42 @@ class PrinterDriver:
         self.mac = mac
         self.name = name
         self.log = on_log or print
-        self._lock = asyncio.Lock()
-        self._hs_queue: asyncio.Queue = asyncio.Queue()
-        self._ctrl_queue: asyncio.Queue = asyncio.Queue()
+        self._lock: Optional[asyncio.Lock] = None
+        self._hs_queue: Optional[asyncio.Queue] = None
+        self._ctrl_queue: Optional[asyncio.Queue] = None
         self.battery: Optional[int] = None
         self.firmware_version: Optional[str] = None
         self.is_connected = False
 
+    @property
+    def lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
+
+    @property
+    def hs_queue(self) -> asyncio.Queue:
+        if self._hs_queue is None:
+            self._hs_queue = asyncio.Queue()
+        return self._hs_queue
+
+    @property
+    def ctrl_queue(self) -> asyncio.Queue:
+        if self._ctrl_queue is None:
+            self._ctrl_queue = asyncio.Queue()
+        return self._ctrl_queue
+
     def _on_notify(self, sender: int, data: bytearray):
         pt = data[0:2]
         if pt in (b"\x5a\x0a", b"\x5a\x0b"):
-            self._hs_queue.put_nowait(bytes(data))
+            self.hs_queue.put_nowait(bytes(data))
         elif pt == b"\x5a\x05":
             ln = int.from_bytes(data[2:4], "big")
-            self._ctrl_queue.put_nowait(("lost", ln))
+            self.ctrl_queue.put_nowait(("lost", ln))
         elif pt == b"\x5a\x06":
-            self._ctrl_queue.put_nowait(("done", 0))
+            self.ctrl_queue.put_nowait(("done", 0))
         elif pt == b"\x5a\x08":
-            self._ctrl_queue.put_nowait(("pause", 0))
+            self.ctrl_queue.put_nowait(("pause", 0))
         elif pt == b"\x5a\x02":
             self.battery = data[2]
             if len(data) >= 10:
@@ -69,7 +87,7 @@ class PrinterDriver:
         # 2. Challenge phase
         await client.write_gatt_char(WRITE_UUID, pkt_challenge(), response=False)
         try:
-            await asyncio.wait_for(self._hs_queue.get(), timeout=5.0)
+            await asyncio.wait_for(self.hs_queue.get(), timeout=5.0)
         except asyncio.TimeoutError:
             self.log("Timeout waiting for handshake challenge reply.")
             return False
@@ -77,7 +95,7 @@ class PrinterDriver:
         # 3. Response phase
         await client.write_gatt_char(WRITE_UUID, pkt_response(self.mac), response=False)
         try:
-            auth_result = await asyncio.wait_for(self._hs_queue.get(), timeout=5.0)
+            auth_result = await asyncio.wait_for(self.hs_queue.get(), timeout=5.0)
             if len(auth_result) > 2 and auth_result[2] == 0x01:
                 self.log(f"Handshake successful. Battery: {self.battery}%")
                 return True
@@ -90,7 +108,7 @@ class PrinterDriver:
 
     async def get_status(self) -> dict:
         """Check printer status (quick connect & read battery)."""
-        async with self._lock:
+        async with self.lock:
             # If we recently got battery, return it, or try a quick fetch
             try:
                 device = await BleakScanner.find_device_by_address(self.mac, timeout=4.0)
@@ -132,7 +150,7 @@ class PrinterDriver:
         on_progress: Optional[Callable[[int, int], None]] = None,
     ) -> bool:
         """Send raster chunks with FunnyPrint flow control (LOST packet rewind, PAUSE, and FINISHED event)."""
-        async with self._lock:
+        async with self.lock:
             self.log(f"Starting print job ({len(chunks)} chunks)...")
 
             # Prepare chunks with blank feed lines
@@ -155,11 +173,14 @@ class PrinterDriver:
                     self.log("Failed to connect to printer.")
                     return False
 
+                # Allow BlueZ service discovery to settle
+                await asyncio.sleep(0.4)
+
                 # Flush queues
-                while not self._ctrl_queue.empty():
-                    self._ctrl_queue.get_nowait()
-                while not self._hs_queue.empty():
-                    self._hs_queue.get_nowait()
+                while not self.ctrl_queue.empty():
+                    self.ctrl_queue.get_nowait()
+                while not self.hs_queue.empty():
+                    self.hs_queue.get_nowait()
 
                 auth_ok = await self._connect_and_auth(client)
                 if not auth_ok:
@@ -183,8 +204,8 @@ class PrinterDriver:
 
                 while not is_finished:
                     # Check flow control events from printer
-                    while not self._ctrl_queue.empty():
-                        event_type, val = self._ctrl_queue.get_nowait()
+                    while not self.ctrl_queue.empty():
+                        event_type, val = self.ctrl_queue.get_nowait()
                         if event_type == "lost":
                             # Retransmit from lost_line - 1
                             new_cur = max(0, val - 1)
@@ -214,8 +235,8 @@ class PrinterDriver:
 
                     # All lines dispatched, wait for printer to physically finish
                     elif cur_line >= total_lines:
-                        if not self._ctrl_queue.empty():
-                            event_type, val = self._ctrl_queue.get_nowait()
+                        if not self.ctrl_queue.empty():
+                            event_type, val = self.ctrl_queue.get_nowait()
                             if event_type == "lost":
                                 cur_line = max(0, val - 1)
                                 wait_for_finish_cnt = 0

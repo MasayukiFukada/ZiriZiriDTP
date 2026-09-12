@@ -347,8 +347,22 @@ document.addEventListener("DOMContentLoaded", () => {
           btnPrint.disabled = false;
         }, 1200);
       } else {
-        const err = await res.json();
-        alert("印刷エラー: " + (err.detail || "送信に失敗しました"));
+        let errDetail = "送信に失敗しました";
+        if (res) {
+          try {
+            const contentType = res.headers.get("content-type") || "";
+            if (contentType.includes("application/json")) {
+              const data = await res.json();
+              errDetail = data.detail || JSON.stringify(data);
+            } else {
+              const text = await res.text();
+              errDetail = text || `HTTP ${res.status}`;
+            }
+          } catch (_) {
+            errDetail = `HTTP ${res.status}`;
+          }
+        }
+        alert("印刷エラー: " + errDetail);
         printModal.classList.remove("active");
         btnPrint.disabled = false;
       }
