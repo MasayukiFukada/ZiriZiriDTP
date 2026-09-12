@@ -53,7 +53,7 @@ class TodoRequest(BaseModel):
     show_datetime: bool = True
     datetime_position: str = "header"  # "header" or "footer"
     show_cut_line: bool = True
-    density: int = 3
+    density: int = 1
     feed: int = 40
 
 
@@ -65,12 +65,12 @@ class TextRequest(BaseModel):
     show_datetime: bool = True
     datetime_position: str = "header"  # "header" or "footer"
     show_cut_line: bool = True
-    density: int = 3
+    density: int = 1
     feed: int = 40
 
 
 class TestChartRequest(BaseModel):
-    density: int = 3
+    density: int = 1
     feed: int = 40
     show_datetime: bool = True
     datetime_position: str = "footer"
@@ -204,7 +204,7 @@ async def print_image_upload(
     show_datetime: bool = Form(True),
     datetime_position: str = Form("footer"),
     show_cut_line: bool = Form(True),
-    density: int = Form(3),
+    density: int = Form(1),
     feed: int = Form(40),
 ):
     """Render and print uploaded photo."""
