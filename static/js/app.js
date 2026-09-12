@@ -45,6 +45,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // Common print settings
   const printDensity = document.getElementById("printDensity");
   const printFeed = document.getElementById("printFeed");
+  const chkShowDate = document.getElementById("chkShowDate");
+  const selDatePos = document.getElementById("selDatePos");
+  const chkCutLine = document.getElementById("chkCutLine");
+
+  chkShowDate.addEventListener("change", requestPreview);
+  selDatePos.addEventListener("change", requestPreview);
+  chkCutLine.addEventListener("change", requestPreview);
 
   // ─────────────────────────────────────────────────────────
   // Tab Navigation
@@ -173,10 +180,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function updatePreview() {
     try {
+      const showDate = chkShowDate.checked;
+      const datePos = selDatePos.value;
+      const showCut = chkCutLine.checked;
+
       if (currentTab === "todo") {
         const payload = {
           title: todoTitle.value || "TODO LIST",
           items: todoItems,
+          show_datetime: showDate,
+          datetime_position: datePos,
+          show_cut_line: showCut,
         };
         const res = await fetch("/api/preview/todo", {
           method: "POST",
@@ -192,6 +206,9 @@ document.addEventListener("DOMContentLoaded", () => {
           font_size: parseInt(textSize.value, 10),
           align: textAlign.value,
           is_bold: textBold.checked,
+          show_datetime: showDate,
+          datetime_position: datePos,
+          show_cut_line: showCut,
         };
         const res = await fetch("/api/preview/text", {
           method: "POST",
@@ -210,6 +227,9 @@ document.addEventListener("DOMContentLoaded", () => {
         formData.append("file", selectedImageFile);
         formData.append("dither", imageDither.value);
         formData.append("contrast", imageContrast.value);
+        formData.append("show_datetime", showDate);
+        formData.append("datetime_position", datePos);
+        formData.append("show_cut_line", showCut);
 
         const res = await fetch("/api/preview/image", {
           method: "POST",
@@ -219,7 +239,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (data.preview) previewImg.src = data.preview;
 
       } else if (currentTab === "test") {
-        const res = await fetch("/api/preview/test", { method: "POST" });
+        const res = await fetch("/api/preview/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            show_datetime: showDate,
+            datetime_position: datePos,
+            show_cut_line: showCut,
+          }),
+        });
         const data = await res.json();
         if (data.preview) previewImg.src = data.preview;
       }
@@ -238,6 +266,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const density = parseInt(printDensity.value, 10);
     const feed = parseInt(printFeed.value, 10);
+    const showDate = chkShowDate.checked;
+    const datePos = selDatePos.value;
+    const showCut = chkCutLine.checked;
 
     try {
       let res;
@@ -248,6 +279,9 @@ document.addEventListener("DOMContentLoaded", () => {
           body: JSON.stringify({
             title: todoTitle.value || "TODO LIST",
             items: todoItems,
+            show_datetime: showDate,
+            datetime_position: datePos,
+            show_cut_line: showCut,
             density,
             feed,
           }),
@@ -261,6 +295,9 @@ document.addEventListener("DOMContentLoaded", () => {
             font_size: parseInt(textSize.value, 10),
             align: textAlign.value,
             is_bold: textBold.checked,
+            show_datetime: showDate,
+            datetime_position: datePos,
+            show_cut_line: showCut,
             density,
             feed,
           }),
@@ -274,6 +311,9 @@ document.addEventListener("DOMContentLoaded", () => {
         formData.append("file", selectedImageFile);
         formData.append("dither", imageDither.value);
         formData.append("contrast", imageContrast.value);
+        formData.append("show_datetime", showDate);
+        formData.append("datetime_position", datePos);
+        formData.append("show_cut_line", showCut);
         formData.append("density", density);
         formData.append("feed", feed);
 
@@ -285,9 +325,16 @@ document.addEventListener("DOMContentLoaded", () => {
         res = await fetch("/api/print/test", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ density, feed }),
+          body: JSON.stringify({
+            density,
+            feed,
+            show_datetime: showDate,
+            datetime_position: datePos,
+            show_cut_line: showCut,
+          }),
         });
       }
+
 
       if (res && res.ok) {
         const resData = await res.json();

@@ -14,6 +14,7 @@ from ziriziri.renderer import (
     render_free_text,
     render_image_dither,
     render_test_chart,
+    append_cut_line,
     pil_to_chunks,
     image_to_base64_png,
 )
@@ -42,6 +43,9 @@ class TodoRequest(BaseModel):
     title: str = "TODO LIST"
     items: List[TodoItem]
     footer: Optional[str] = "ZiriZiriDTP * SWS-PT1"
+    show_datetime: bool = True
+    datetime_position: str = "header"  # "header" or "footer"
+    show_cut_line: bool = True
     density: int = 3
     feed: int = 40
 
@@ -51,6 +55,9 @@ class TextRequest(BaseModel):
     font_size: int = 18
     align: str = "left"  # "left", "center", "right"
     is_bold: bool = False
+    show_datetime: bool = True
+    datetime_position: str = "header"  # "header" or "footer"
+    show_cut_line: bool = True
     density: int = 3
     feed: int = 40
 
@@ -58,6 +65,9 @@ class TextRequest(BaseModel):
 class TestChartRequest(BaseModel):
     density: int = 3
     feed: int = 40
+    show_datetime: bool = True
+    datetime_position: str = "footer"
+    show_cut_line: bool = True
 
 
 # ─────────────────────────────────────────────────────────────
@@ -87,7 +97,11 @@ async def preview_todo(req: TodoRequest):
         title=req.title,
         items=[itm.model_dump() for itm in req.items],
         footer_text=req.footer,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
     )
+    if req.show_cut_line:
+        img = append_cut_line(img)
     return {"preview": image_to_base64_png(img), "height": img.height}
 
 
@@ -98,7 +112,11 @@ async def print_todo(req: TodoRequest):
         title=req.title,
         items=[itm.model_dump() for itm in req.items],
         footer_text=req.footer,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
     )
+    if req.show_cut_line:
+        img = append_cut_line(img)
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:
@@ -114,7 +132,11 @@ async def preview_text(req: TextRequest):
         font_size=req.font_size,
         align=req.align,
         is_bold=req.is_bold,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
     )
+    if req.show_cut_line:
+        img = append_cut_line(img)
     return {"preview": image_to_base64_png(img), "height": img.height}
 
 
@@ -126,7 +148,11 @@ async def print_text(req: TextRequest):
         font_size=req.font_size,
         align=req.align,
         is_bold=req.is_bold,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
     )
+    if req.show_cut_line:
+        img = append_cut_line(img)
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:
@@ -139,10 +165,21 @@ async def preview_image(
     file: UploadFile = File(...),
     dither: bool = Form(True),
     contrast: float = Form(1.0),
+    show_datetime: bool = Form(True),
+    datetime_position: str = Form("footer"),
+    show_cut_line: bool = Form(True),
 ):
     """Generate preview image for uploaded photo."""
     content = await file.read()
-    img = render_image_dither(content, dither=dither, contrast=contrast)
+    img = render_image_dither(
+        content,
+        dither=dither,
+        contrast=contrast,
+        show_datetime=show_datetime,
+        datetime_position=datetime_position,
+    )
+    if show_cut_line:
+        img = append_cut_line(img)
     return {"preview": image_to_base64_png(img), "height": img.height}
 
 
@@ -151,12 +188,23 @@ async def print_image_upload(
     file: UploadFile = File(...),
     dither: bool = Form(True),
     contrast: float = Form(1.0),
+    show_datetime: bool = Form(True),
+    datetime_position: str = Form("footer"),
+    show_cut_line: bool = Form(True),
     density: int = Form(3),
     feed: int = Form(40),
 ):
     """Render and print uploaded photo."""
     content = await file.read()
-    img = render_image_dither(content, dither=dither, contrast=contrast)
+    img = render_image_dither(
+        content,
+        dither=dither,
+        contrast=contrast,
+        show_datetime=show_datetime,
+        datetime_position=datetime_position,
+    )
+    if show_cut_line:
+        img = append_cut_line(img)
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=density, feed_after=feed)
     if not success:
@@ -164,17 +212,28 @@ async def print_image_upload(
     return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
 
 
+
 @app.post("/api/preview/test")
-async def preview_test_chart():
+async def preview_test_chart(req: Optional[TestChartRequest] = None):
     """Generate preview image for diagnostic test chart."""
-    img = render_test_chart()
+    show_datetime = req.show_datetime if req else True
+    datetime_position = req.datetime_position if req else "footer"
+    show_cut_line = req.show_cut_line if req else True
+    img = render_test_chart(show_datetime=show_datetime, datetime_position=datetime_position)
+    if show_cut_line:
+        img = append_cut_line(img)
     return {"preview": image_to_base64_png(img), "height": img.height}
 
 
 @app.post("/api/print/test")
 async def print_test_chart(req: TestChartRequest):
     """Print diagnostic test chart."""
-    img = render_test_chart()
+    img = render_test_chart(
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
+    )
+    if req.show_cut_line:
+        img = append_cut_line(img)
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:

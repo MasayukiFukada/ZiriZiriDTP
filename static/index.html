@@ -156,7 +156,28 @@
       </div>
 
       <!-- Print Settings (Common) -->
-      <div class="form-group" style="margin-top:10px; padding-top:14px; border-top:1px solid var(--border-color);">
+      <div class="form-group" style="margin-top:10px; padding-top:14px; border-top:1px solid var(--border-color); display:flex; flex-direction:column; gap:12px;">
+        
+        <!-- Timestamp Option -->
+        <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-primary); cursor:pointer;">
+            <input type="checkbox" id="chkShowDate" class="todo-checkbox" checked>
+            📅 印刷日時を印字する
+          </label>
+          <select id="selDatePos" class="input-text" style="padding:6px 10px; font-size:0.8rem; width:auto;">
+            <option value="header" selected>上部 (ヘッダー)</option>
+            <option value="footer">下部 (フッター)</option>
+          </select>
+        </div>
+
+        <!-- Cut Line Option -->
+        <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.03); padding:10px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
+          <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-primary); cursor:pointer;">
+            <input type="checkbox" id="chkCutLine" class="todo-checkbox" checked>
+            ✂️ キリトリ線を印字する (ハサミ切り用)
+          </label>
+        </div>
+
         <div class="controls-grid">
           <div>
             <label class="form-label">印字濃度 (Darkness)</label>
@@ -178,6 +199,7 @@
         </div>
       </div>
 
+
     </section>
 
   </main>
@@ -197,6 +219,6 @@
     <div style="font-size:0.85rem; color:var(--text-secondary);">少々お待ちください</div>
   </div>
 
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=3"></script>
 </body>
 </html>
