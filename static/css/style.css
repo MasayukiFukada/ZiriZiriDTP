@@ -1,0 +1,461 @@
+/* ZiriZiriDTP - Modern Mobile Thermal Printer Web UI */
+
+:root {
+  --bg-primary: #0f1117;
+  --bg-secondary: #1a1d27;
+  --bg-card: rgba(26, 29, 39, 0.85);
+  --accent: #ff5e3a;
+  --accent-gradient: linear-gradient(135deg, #ff5e3a 0%, #ff2a6d 100%);
+  --accent-glow: rgba(255, 94, 58, 0.35);
+  --text-primary: #f0f2f8;
+  --text-secondary: #9499ad;
+  --text-muted: #5e6378;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --paper-bg: #faf8f5;
+  --paper-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  min-height: 100vh;
+  padding-bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* Header */
+.app-header {
+  width: 100%;
+  max-width: 480px;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(16px);
+  background: rgba(15, 17, 23, 0.8);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--accent-gradient);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 16px var(--accent-glow);
+  font-size: 18px;
+}
+
+.app-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.app-title span {
+  color: #ff5e3a;
+}
+
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+/* Main Container */
+.main-container {
+  width: 100%;
+  max-width: 480px;
+  padding: 16px 16px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Receipt Preview Section */
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.preview-label {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.receipt-slot {
+  width: 100%;
+  background: #242735;
+  border-radius: 12px 12px 0 0;
+  padding: 8px 16px 0;
+  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.6);
+  border-top: 2px solid #383c50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.receipt-slot-slit {
+  width: 90%;
+  height: 6px;
+  background: #090a0f;
+  border-radius: 3px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+}
+
+.receipt-paper {
+  width: 100%;
+  max-width: 384px;
+  background: var(--paper-bg);
+  color: #111;
+  box-shadow: var(--paper-shadow);
+  transform-origin: top center;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 4px 4px;
+}
+
+.receipt-paper img {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.receipt-serrated-bottom {
+  height: 10px;
+  width: 100%;
+  background-image: radial-gradient(circle, transparent, transparent 50%, var(--paper-bg) 50%, var(--paper-bg) 100%);
+  background-size: 14px 14px;
+}
+
+/* Tabs */
+.tabs-nav {
+  display: flex;
+  background: var(--bg-secondary);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  gap: 4px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.tab-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Editor Panel Card */
+.editor-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  backdrop-filter: blur(20px);
+}
+
+.tab-pane {
+  display: none;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tab-pane.active {
+  display: flex;
+}
+
+/* Form Controls */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.input-text {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-text:focus {
+  border-color: var(--accent);
+}
+
+.textarea-text {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* TODO Items list */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  gap: 10px;
+}
+
+.todo-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.todo-checkbox {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.todo-text {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.todo-text.checked {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.btn-delete {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 1rem;
+  transition: color 0.2s;
+}
+
+.btn-delete:hover {
+  color: #ff4d4f;
+}
+
+/* Add Item Bar */
+.add-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.add-bar .input-text {
+  flex: 1;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Presets pill */
+.presets-container {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.preset-chip {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-chip:hover {
+  background: var(--accent-glow);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+/* Controls Grid */
+.controls-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Print Floating Action Bar */
+.print-action-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px 16px 20px;
+  background: linear-gradient(to top, rgba(15, 17, 23, 0.98) 70%, transparent);
+  z-index: 99;
+}
+
+.btn-print {
+  width: 100%;
+  padding: 16px;
+  background: var(--accent-gradient);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  box-shadow: 0 6px 20px var(--accent-glow);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-print:active {
+  transform: scale(0.98);
+}
+
+.btn-print:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+/* Loader / Printing modal overlay */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.printing-spinner {
+  width: 54px;
+  height: 54px;
+  border: 4px solid rgba(255, 94, 58, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.modal-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+}

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ZiriZiriDTP - スマホ簡単サーマルプリント</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="app-header">
+    <div class="logo-container">
+      <div class="logo-icon">🖨️</div>
+      <h1 class="app-title">ZiriZiri<span>DTP</span></h1>
+    </div>
+    <div class="status-badge" id="statusBadge">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">SWS-PT1 接続中</span>
+    </div>
+  </header>
+
+  <main class="main-container">
+
+    <!-- Receipt Preview Output -->
+    <section class="preview-section">
+      <div class="preview-label">
+        <span>📄 印字プレビュー</span>
+      </div>
+      <div class="receipt-slot">
+        <div class="receipt-slot-slit"></div>
+        <div class="receipt-paper" id="receiptPaper">
+          <img id="previewImg" alt="Receipt Preview" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='384' height='120'><rect width='384' height='120' fill='%23faf8f5'/><text x='192' y='65' font-family='sans-serif' font-size='14' fill='%23999' text-anchor='middle'>プレビュー読み込み中...</text></svg>">
+          <div class="receipt-serrated-bottom"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Mode Tabs -->
+    <nav class="tabs-nav">
+      <button class="tab-btn active" data-tab="todo">🛒 TODO</button>
+      <button class="tab-btn" data-tab="text">📝 メモ</button>
+      <button class="tab-btn" data-tab="image">🖼️ 写真</button>
+      <button class="tab-btn" data-tab="test">📊 テスト</button>
+    </nav>
+
+    <!-- Editor Card -->
+    <section class="editor-card">
+
+      <!-- Tab 1: TODO & Shopping List -->
+      <div class="tab-pane active" id="pane-todo">
+        <div class="form-group">
+          <label class="form-label">レシート見出しタイトル</label>
+          <input type="text" id="todoTitle" class="input-text" value="お買い物リスト">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">アイテム追加</label>
+          <div class="add-bar">
+            <input type="text" id="todoInput" class="input-text" placeholder="例: 牛乳、たまご、感熱紙">
+            <button class="btn-secondary" id="btnAddTodo">追加</button>
+          </div>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="form-group">
+          <label class="form-label">定番アイテム（タップで即追加）</label>
+          <div class="presets-container">
+            <button class="preset-chip">+ 牛乳</button>
+            <button class="preset-chip">+ 食パン</button>
+            <button class="preset-chip">+ たまご</button>
+            <button class="preset-chip">+ 納豆</button>
+            <button class="preset-chip">+ お米</button>
+            <button class="preset-chip">+ トイレットペーパー</button>
+            <button class="preset-chip">+ 感熱紙ロール</button>
+          </div>
+        </div>
+
+        <!-- Items list -->
+        <div class="form-group">
+          <label class="form-label">リスト項目（タップで完了/削除）</label>
+          <div class="todo-list" id="todoList">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Free Text & Notes -->
+      <div class="tab-pane" id="pane-text">
+        <div class="form-group">
+          <label class="form-label">フリーメモ内容</label>
+          <textarea id="freeText" class="input-text textarea-text" placeholder="ここに印刷したい文字を入力...">【おぼえがき】
+本日中にやること：
+・プリンタ用紙の予備補充
+・ファームウェア設定確認
+よろしくお願いします！</textarea>
+        </div>
+
+        <div class="controls-grid">
+          <div class="form-group">
+            <label class="form-label">文字サイズ</label>
+            <select id="textSize" class="input-text">
+              <option value="14">小 (14pt)</option>
+              <option value="18" selected>中 (18pt)</option>
+              <option value="24">大 (24pt)</option>
+              <option value="32">特大 (32pt)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">文字配置</label>
+            <select id="textAlign" class="input-text">
+              <option value="left">左寄せ</option>
+              <option value="center">中央揃え</option>
+              <option value="right">右寄せ</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-secondary); cursor:pointer;">
+            <input type="checkbox" id="textBold" class="todo-checkbox">
+            太字でくっきり印刷する
+          </label>
+        </div>
+      </div>
+
+      <!-- Tab 3: Photo & Image Dithering -->
+      <div class="tab-pane" id="pane-image">
+        <div class="form-group">
+          <label class="form-label">印刷する画像・写真を選択</label>
+          <input type="file" id="imageInput" class="input-text" accept="image/*">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">白黒ディザリング（網点階調表現）</label>
+          <select id="imageDither" class="input-text">
+            <option value="true" selected>誤差拡散 (Floyd-Steinberg - 写真向け)</option>
+            <option value="false">二値化しきい値 (白黒クッキリ - イラスト・図向け)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">コントラスト強調: <span id="contrastVal">1.2</span>x</label>
+          <input type="range" id="imageContrast" min="0.5" max="2.5" step="0.1" value="1.2" style="width:100%; accent-color:var(--accent);">
+        </div>
+      </div>
+
+      <!-- Tab 4: Diagnostics & Test Chart -->
+      <div class="tab-pane" id="pane-test">
+        <div class="form-group">
+          <label class="form-label">プリンタ診断テストチャート</label>
+          <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.5;">
+            フォントサイズ一覧（8pt〜20pt）、ディザリング階調グラデーション、解像度ルーラー（ピクセル単位のドット抜けやズレ確認）を一度に確認できるテストシートです。
+          </p>
+        </div>
+      </div>
+
+      <!-- Print Settings (Common) -->
+      <div class="form-group" style="margin-top:10px; padding-top:14px; border-top:1px solid var(--border-color);">
+        <div class="controls-grid">
+          <div>
+            <label class="form-label">印字濃度 (Darkness)</label>
+            <select id="printDensity" class="input-text">
+              <option value="1">薄め (1)</option>
+              <option value="3" selected>標準 (3)</option>
+              <option value="5">濃いめ (5)</option>
+              <option value="7">最高濃度 (7)</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">余白送り量</label>
+            <select id="printFeed" class="input-text">
+              <option value="20">短め (20px)</option>
+              <option value="40" selected>標準 (40px)</option>
+              <option value="80">長め (80px)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Bottom Action Print Button -->
+  <div class="print-action-bar">
+    <button class="btn-print" id="btnPrint">
+      <span>🖨️</span>
+      <span id="printBtnText">SWS-PT1 で今すぐ印刷</span>
+    </button>
+  </div>
+
+  <!-- Printing Overlay Modal -->
+  <div class="modal-overlay" id="printModal">
+    <div class="printing-spinner"></div>
+    <div class="modal-text" id="modalText">プリンタへ送信中… ジジジ</div>
+    <div style="font-size:0.85rem; color:var(--text-secondary);">少々お待ちください</div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
