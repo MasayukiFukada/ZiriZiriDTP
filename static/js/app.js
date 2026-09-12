@@ -29,12 +29,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnAddTodo = document.getElementById("btnAddTodo");
   const todoList = document.getElementById("todoList");
   const presetChips = document.querySelectorAll(".preset-chip");
+  const btnClearCompletedTodos = document.getElementById("btnClearCompletedTodos");
+  const btnClearAllTodos = document.getElementById("btnClearAllTodos");
 
   // Text elements
   const freeText = document.getElementById("freeText");
   const textSize = document.getElementById("textSize");
   const textAlign = document.getElementById("textAlign");
   const textBold = document.getElementById("textBold");
+  const btnClearText = document.getElementById("btnClearText");
 
   // Image elements
   const imageInput = document.getElementById("imageInput");
@@ -49,23 +52,89 @@ document.addEventListener("DOMContentLoaded", () => {
   const selDatePos = document.getElementById("selDatePos");
   const chkCutLine = document.getElementById("chkCutLine");
 
-  chkShowDate.addEventListener("change", requestPreview);
-  selDatePos.addEventListener("change", requestPreview);
-  chkCutLine.addEventListener("change", requestPreview);
+  // ─────────────────────────────────────────────────────────
+  // Restore State from LocalStorage
+  // ─────────────────────────────────────────────────────────
+  // TODO Title
+  const savedTodoTitle = localStorage.getItem("ziriziri_todo_title");
+  if (savedTodoTitle !== null) {
+    todoTitle.value = savedTodoTitle;
+  }
+
+  // Free Text & Text Options
+  const savedMemoText = localStorage.getItem("ziriziri_memo_text");
+  if (savedMemoText !== null) {
+    freeText.value = savedMemoText;
+  }
+  const savedMemoSize = localStorage.getItem("ziriziri_memo_size");
+  if (savedMemoSize !== null) {
+    textSize.value = savedMemoSize;
+  }
+  const savedMemoAlign = localStorage.getItem("ziriziri_memo_align");
+  if (savedMemoAlign !== null) {
+    textAlign.value = savedMemoAlign;
+  }
+  const savedMemoBold = localStorage.getItem("ziriziri_memo_bold");
+  if (savedMemoBold !== null) {
+    textBold.checked = savedMemoBold === "true";
+  }
+
+  // Print options
+  const savedShowDate = localStorage.getItem("ziriziri_opt_show_date");
+  if (savedShowDate !== null) chkShowDate.checked = savedShowDate === "true";
+  const savedDatePos = localStorage.getItem("ziriziri_opt_date_pos");
+  if (savedDatePos !== null) selDatePos.value = savedDatePos;
+  const savedCutLine = localStorage.getItem("ziriziri_opt_cut_line");
+  if (savedCutLine !== null) chkCutLine.checked = savedCutLine === "true";
+  const savedDensity = localStorage.getItem("ziriziri_opt_density");
+  if (savedDensity !== null) printDensity.value = savedDensity;
+  const savedFeed = localStorage.getItem("ziriziri_opt_feed");
+  if (savedFeed !== null) printFeed.value = savedFeed;
+
+  // Active Tab
+  const savedTab = localStorage.getItem("ziriziri_active_tab");
+  if (savedTab && document.getElementById(`pane-${savedTab}`)) {
+    currentTab = savedTab;
+  }
+
+  chkShowDate.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_opt_show_date", chkShowDate.checked);
+    requestPreview();
+  });
+  selDatePos.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_opt_date_pos", selDatePos.value);
+    requestPreview();
+  });
+  chkCutLine.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_opt_cut_line", chkCutLine.checked);
+    requestPreview();
+  });
+  printDensity.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_opt_density", printDensity.value);
+  });
+  printFeed.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_opt_feed", printFeed.value);
+  });
 
   // ─────────────────────────────────────────────────────────
   // Tab Navigation
   // ─────────────────────────────────────────────────────────
+  function switchTab(tabName) {
+    currentTab = tabName;
+    localStorage.setItem("ziriziri_active_tab", tabName);
+    tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tabName));
+    tabPanes.forEach((p) => p.classList.toggle("active", p.id === `pane-${tabName}`));
+    requestPreview();
+  }
+
   tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("active"));
-      tabPanes.forEach((p) => p.classList.remove("active"));
-      tab.classList.add("active");
-      currentTab = tab.dataset.tab;
-      document.getElementById(`pane-${currentTab}`).classList.add("active");
-      requestPreview();
+      switchTab(tab.dataset.tab);
     });
   });
+
+  // Apply initial active tab
+  switchTab(currentTab);
 
   // ─────────────────────────────────────────────────────────
   // TODO Management
@@ -147,15 +216,72 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  todoTitle.addEventListener("input", requestPreview);
+  todoTitle.addEventListener("input", () => {
+    localStorage.setItem("ziriziri_todo_title", todoTitle.value);
+    requestPreview();
+  });
+
+  if (btnClearCompletedTodos) {
+    btnClearCompletedTodos.addEventListener("click", () => {
+      const hasChecked = todoItems.some((itm) => itm.checked);
+      if (!hasChecked) return;
+      todoItems = todoItems.filter((itm) => !itm.checked);
+      saveTodos();
+      renderTodoList();
+      requestPreview();
+    });
+  }
+
+  if (btnClearAllTodos) {
+    btnClearAllTodos.addEventListener("click", () => {
+      if (todoItems.length === 0) return;
+      if (confirm("TODOリストの全項目を削除しますか？")) {
+        todoItems = [];
+        saveTodos();
+        renderTodoList();
+        requestPreview();
+      }
+    });
+  }
 
   // ─────────────────────────────────────────────────────────
   // Text & Image Controls Events
   // ─────────────────────────────────────────────────────────
-  freeText.addEventListener("input", requestPreview);
-  textSize.addEventListener("change", requestPreview);
-  textAlign.addEventListener("change", requestPreview);
-  textBold.addEventListener("change", requestPreview);
+  freeText.addEventListener("input", () => {
+    localStorage.setItem("ziriziri_memo_text", freeText.value);
+    requestPreview();
+  });
+
+  textSize.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_memo_size", textSize.value);
+    requestPreview();
+  });
+
+  textAlign.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_memo_align", textAlign.value);
+    requestPreview();
+  });
+
+  textBold.addEventListener("change", () => {
+    localStorage.setItem("ziriziri_memo_bold", textBold.checked);
+    requestPreview();
+  });
+
+  if (btnClearText) {
+    btnClearText.addEventListener("click", () => {
+      if (!freeText.value.trim()) {
+        freeText.value = "";
+        freeText.focus();
+        return;
+      }
+      if (confirm("メモの内容をクリアしますか？")) {
+        freeText.value = "";
+        localStorage.setItem("ziriziri_memo_text", "");
+        requestPreview();
+        freeText.focus();
+      }
+    });
+  }
 
   imageInput.addEventListener("change", (e) => {
     if (e.target.files && e.target.files[0]) {

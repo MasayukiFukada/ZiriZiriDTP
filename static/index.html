@@ -78,7 +78,13 @@
 
         <!-- Items list -->
         <div class="form-group">
-          <label class="form-label">リスト項目（タップで完了/削除）</label>
+          <div class="form-label-row">
+            <label class="form-label">リスト項目（タップで完了/削除）</label>
+            <div class="form-label-actions">
+              <button type="button" class="btn-text-action" id="btnClearCompletedTodos" title="チェック済みの項目を削除">✓ 完了分削除</button>
+              <button type="button" class="btn-text-action danger" id="btnClearAllTodos" title="すべての項目を削除">🗑️ 全削除</button>
+            </div>
+          </div>
           <div class="todo-list" id="todoList">
             <!-- Rendered by JS -->
           </div>
@@ -88,7 +94,10 @@
       <!-- Tab 2: Free Text & Notes -->
       <div class="tab-pane" id="pane-text">
         <div class="form-group">
-          <label class="form-label">フリーメモ内容</label>
+          <div class="form-label-row">
+            <label class="form-label" for="freeText">フリーメモ内容</label>
+            <button type="button" class="btn-text-action danger" id="btnClearText" title="メモの内容をクリア">🗑️ クリア</button>
+          </div>
           <textarea id="freeText" class="input-text textarea-text" placeholder="ここに印刷したい文字を入力...">【おぼえがき】
 本日中にやること：
 ・プリンタ用紙の予備補充
