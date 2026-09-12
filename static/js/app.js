@@ -28,7 +28,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const todoInput = document.getElementById("todoInput");
   const btnAddTodo = document.getElementById("btnAddTodo");
   const todoList = document.getElementById("todoList");
-  const presetChips = document.querySelectorAll(".preset-chip");
   const btnClearCompletedTodos = document.getElementById("btnClearCompletedTodos");
   const btnClearAllTodos = document.getElementById("btnClearAllTodos");
 
@@ -207,13 +206,6 @@ document.addEventListener("DOMContentLoaded", () => {
       addTodoItem(todoInput.value);
       todoInput.value = "";
     }
-  });
-
-  presetChips.forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const itemText = chip.textContent.replace(/^\+\s*/, "");
-      addTodoItem(itemText);
-    });
   });
 
   todoTitle.addEventListener("input", () => {

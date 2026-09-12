@@ -391,30 +391,6 @@ body {
   background: rgba(255, 255, 255, 0.15);
 }
 
-/* Presets pill */
-.presets-container {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.preset-chip {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  padding: 4px 10px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.preset-chip:hover {
-  background: var(--accent-glow);
-  color: #fff;
-  border-color: var(--accent);
-}
-
 /* Controls Grid */
 .controls-grid {
   display: grid;
