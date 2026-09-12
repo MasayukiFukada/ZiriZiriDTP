@@ -267,18 +267,56 @@ document.addEventListener("DOMContentLoaded", () => {
     requestPreview();
   });
 
+  let lastClearedText = null;
+  let restoreTimeout = null;
+
   if (btnClearText) {
-    btnClearText.addEventListener("click", () => {
-      if (!freeText.value.trim()) {
-        freeText.value = "";
+    btnClearText.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (btnClearText.dataset.mode === "undo" && lastClearedText !== null) {
+        freeText.value = lastClearedText;
+        localStorage.setItem("ziriziri_memo_text", lastClearedText);
+        btnClearText.textContent = "🗑️ クリア";
+        btnClearText.classList.add("danger");
+        delete btnClearText.dataset.mode;
+        lastClearedText = null;
+        if (restoreTimeout) clearTimeout(restoreTimeout);
+        requestPreview();
         freeText.focus();
         return;
       }
-      if (confirm("メモの内容をクリアしますか？")) {
-        freeText.value = "";
-        localStorage.setItem("ziriziri_memo_text", "");
-        requestPreview();
+
+      if (!freeText.value) {
         freeText.focus();
+        return;
+      }
+
+      lastClearedText = freeText.value;
+      freeText.value = "";
+      localStorage.setItem("ziriziri_memo_text", "");
+      requestPreview();
+      freeText.focus();
+
+      btnClearText.textContent = "↩️ 元に戻す";
+      btnClearText.classList.remove("danger");
+      btnClearText.dataset.mode = "undo";
+
+      if (restoreTimeout) clearTimeout(restoreTimeout);
+      restoreTimeout = setTimeout(() => {
+        btnClearText.textContent = "🗑️ クリア";
+        btnClearText.classList.add("danger");
+        delete btnClearText.dataset.mode;
+        lastClearedText = null;
+      }, 5000);
+    });
+
+    freeText.addEventListener("input", () => {
+      if (btnClearText.dataset.mode === "undo") {
+        btnClearText.textContent = "🗑️ クリア";
+        btnClearText.classList.add("danger");
+        delete btnClearText.dataset.mode;
+        lastClearedText = null;
+        if (restoreTimeout) clearTimeout(restoreTimeout);
       }
     });
   }
