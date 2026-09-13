@@ -27,6 +27,7 @@
   - 本リポジトリのように `.jj` ディレクトリが存在し Jujutsu を使用している環境では、`git` ではなく **`jj` コマンドを使用してください**（例: `jj status`, `jj diff`, `jj commit -m "..."`, `jj describe -m "..."` 等）。
 - **Conventional Commits 規約の遵守**:
   - コミットメッセージには必ず **Conventional Commits** 形式を遵守してください。
+  - 日本語でメッセージを記載してください。
 
 ### フォーマット
 ```text
