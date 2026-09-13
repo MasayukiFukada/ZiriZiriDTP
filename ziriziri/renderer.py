@@ -1,6 +1,7 @@
 """Image and receipt rendering engine for thermal printing."""
 
 import base64
+import urllib.parse
 from io import BytesIO
 from itertools import islice
 from typing import List, Optional
@@ -286,6 +287,216 @@ def render_todo_receipt(
 
     # Bottom border
     draw.rectangle([(0, total_h - 4), (w - 1, total_h - 1)], fill=0)
+
+    return img
+
+
+def build_gmaps_url(destination: str, travel_mode: str = "driving", action: str = "navigate") -> str:
+    """Build a Google Maps universal URL for directions/navigation or search.
+
+    Parameters:
+        destination: Target place name, address, or 'lat,lng'.
+        travel_mode: 'driving', 'bicycling', 'walking', 'transit'.
+        action: 'navigate' (direct turn-by-turn navigation) or 'search' (place overview).
+    """
+    dest = (destination or "").strip()
+    if not dest:
+        return "https://www.google.com/maps"
+    encoded_dest = urllib.parse.quote(dest)
+
+    if action == "search":
+        return f"https://www.google.com/maps/search/?api=1&query={encoded_dest}"
+
+    mode = travel_mode if travel_mode in ("driving", "bicycling", "walking", "transit") else "driving"
+    return f"https://www.google.com/maps/dir/?api=1&destination={encoded_dest}&travelmode={mode}&dir_action=navigate"
+
+
+def render_route_sheet(
+    title: str = "🚗 ドライブルート",
+    items: Optional[List[dict]] = None,
+    travel_mode: str = "driving",
+    footer_text: Optional[str] = "ZiriZiriDTP * Safe Trip!",
+    show_datetime: bool = True,
+    datetime_position: str = "header",
+    show_cut_line: bool = True,
+) -> Image.Image:
+    """Render a travel/drive route sheet with turn-by-turn Google Maps navigation QR codes.
+
+    Layout per stop:
+    - Step index [01], Checkbox [ ], Destination Name (bold, wrapped), Note, Action badge
+    - Right side: Scan-optimized QR code for instant navigation launcher
+    - Between stops: Route connector arrow/line (↓)
+    """
+    w = PRINTER_WIDTH
+    items = items or []
+
+    font_title = get_font(20, bold=True)
+    font_badge = get_font(12, bold=True)
+    font_name = get_font(16, bold=True)
+    font_note = get_font(12)
+    font_small = get_font(11)
+    font_date = get_font(12)
+    font_sub = get_font(12)
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    mode_labels = {
+        "driving": "車 / DRIVING 🚗",
+        "bicycling": "自転車 / BIKING 🚲",
+        "walking": "徒歩 / WALKING 🚶",
+        "transit": "交通機関 / TRANSIT 🚃",
+    }
+    mode_str = mode_labels.get(travel_mode, travel_mode.upper())
+
+    # Pre-process items
+    rendered_items = []
+    total_items_h = 0
+
+    for idx, itm in enumerate(items, 1):
+        name = (itm.get("name") or "").strip()
+        location = (itm.get("location") or name).strip()
+        note = (itm.get("note") or "").strip()
+        checked = itm.get("checked", False)
+        action = itm.get("action", "navigate")
+
+        # Generate Navigation QR
+        url = build_gmaps_url(location, travel_mode=travel_mode, action=action)
+        try:
+            qr_img = make_todo_qr(url, max_size=104)
+        except Exception:
+            qr_img = None
+
+        action_label = "[ナビ起動]" if action == "navigate" else "[地図詳細]"
+
+        # Text wrap
+        # Left content width: 384 - 104 (QR) - 20 (padding) - 70 (left offset) = approx 180px
+        max_text_w = 185
+        name_lines = wrap_text(name or location or f"スポット {idx}", font_name, max_width=max_text_w)
+        note_lines = wrap_text(note, font_note, max_width=max_text_w) if note else []
+
+        # Calculate height for this step
+        text_h = len(name_lines) * 22 + (len(note_lines) * 16) + 20 + 8
+        qr_h = qr_img.height if qr_img else 0
+        step_h = max(text_h, qr_h + 8, 54)
+
+        # Space for connecting connector line between items
+        has_next = (idx < len(items))
+        connector_h = 16 if has_next else 0
+
+        rendered_items.append({
+            "idx": idx,
+            "checked": checked,
+            "name_lines": name_lines,
+            "note_lines": note_lines,
+            "action_label": action_label,
+            "qr_img": qr_img,
+            "step_h": step_h,
+            "connector_h": connector_h,
+        })
+        total_items_h += step_h + connector_h
+
+    if not rendered_items:
+        total_items_h = 44
+
+    header_h = 92 if (show_datetime and datetime_position == "header") else 72
+    footer_h = 62 if (show_datetime and datetime_position == "footer") else 46
+    total_h = header_h + total_items_h + footer_h
+    if total_h % 2 != 0:
+        total_h += 1
+
+    img = Image.new("1", (w, total_h), 1)
+    draw = ImageDraw.Draw(img)
+
+    # Header decorative borders
+    draw.rectangle([(0, 0), (w - 1, 4)], fill=0)
+    draw.rectangle([(0, 7), (w - 1, 9)], fill=0)
+
+    # Title & Travel mode
+    draw.text((w // 2, 26), title, font=font_title, fill=0, anchor="mm")
+    draw.text((w // 2, 48), f"MODE: {mode_str}", font=font_badge, fill=0, anchor="mm")
+
+    sep_y = 58
+    if show_datetime and datetime_position == "header":
+        draw.text((w // 2, 68), now_str, font=font_date, fill=0, anchor="mm")
+        sep_y = 80
+
+    # Header separator dotted line
+    for x in range(12, w - 12, 6):
+        draw.line([(x, sep_y), (x + 3, sep_y)], fill=0, width=1)
+
+    # Render items
+    y = sep_y + 10
+    if not rendered_items:
+        draw.text((w // 2, y + 10), "（経由地・目的地が登録されていません）", font=font_note, fill=0, anchor="mm")
+        y += 34
+    else:
+        for itm in rendered_items:
+            idx = itm["idx"]
+            checked = itm["checked"]
+            name_lines = itm["name_lines"]
+            note_lines = itm["note_lines"]
+            action_label = itm["action_label"]
+            qr_img = itm["qr_img"]
+            step_h = itm["step_h"]
+            connector_h = itm["connector_h"]
+
+            # Step index badge [01]
+            badge_text = f"[{idx:02d}]"
+            draw.text((12, y + 4), badge_text, font=font_badge, fill=0)
+
+            # Checkbox square (16x16)
+            bx, by = 46, y + 4
+            draw.rectangle([(bx, by), (bx + 16, by + 16)], fill=1, outline=0, width=2)
+            if checked:
+                draw.line([(bx + 3, by + 8), (bx + 7, by + 13)], fill=0, width=2)
+                draw.line([(bx + 7, by + 13), (bx + 14, by + 3)], fill=0, width=2)
+
+            # Text content
+            ty = y + 2
+            for line in name_lines:
+                draw.text((70, ty), line, font=font_name, fill=0)
+                ty += 22
+
+            for nline in note_lines:
+                draw.text((70, ty), nline, font=font_note, fill=0)
+                ty += 16
+
+            # Action tag [ナビ起動] or [地図詳細]
+            draw.text((70, ty), action_label, font=font_small, fill=0)
+
+            # QR code on right
+            if qr_img:
+                qr_x = w - qr_img.width - 12
+                qr_y = y + (step_h - qr_img.height) // 2
+                img.paste(qr_img, (qr_x, qr_y))
+
+            y += step_h
+
+            # Connector line/arrow between steps
+            if connector_h > 0:
+                cx = 54  # Align with checkbox center
+                draw.line([(cx, y - 2), (cx, y + connector_h - 4)], fill=0, width=2)
+                draw.line([(cx - 3, y + connector_h - 7), (cx, y + connector_h - 4)], fill=0, width=2)
+                draw.line([(cx + 3, y + connector_h - 7), (cx, y + connector_h - 4)], fill=0, width=2)
+                y += connector_h
+
+    # Footer separator
+    draw.line([(12, y + 6), (w - 12, y + 6)], fill=0, width=1)
+
+    # Footer content
+    fy = y + 20
+    if show_datetime and datetime_position == "footer":
+        draw.text((w // 2, fy), now_str, font=font_date, fill=0, anchor="mm")
+        fy += 18
+
+    f_text = footer_text or "ZiriZiriDTP * Safe Trip!"
+    draw.text((w // 2, fy), f_text, font=font_sub, fill=0, anchor="mm")
+
+    # Bottom border
+    draw.rectangle([(0, total_h - 4), (w - 1, total_h - 1)], fill=0)
+
+    if show_cut_line:
+        img = append_cut_line(img)
 
     return img
 

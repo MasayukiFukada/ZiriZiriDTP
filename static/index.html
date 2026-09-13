@@ -37,8 +37,10 @@
     </section>
 
     <!-- Mode Tabs -->
+    <!-- Mode Tabs -->
     <nav class="tabs-nav">
       <button class="tab-btn active" data-tab="todo">🛒 TODO</button>
+      <button class="tab-btn" data-tab="route">🚗 ルート</button>
       <button class="tab-btn" data-tab="text">📝 メモ</button>
       <button class="tab-btn" data-tab="image">🖼️ 写真</button>
       <button class="tab-btn" data-tab="test">📊 テスト</button>
@@ -97,7 +99,66 @@
         </div>
       </div>
 
-      <!-- Tab 2: Free Text & Notes -->
+      <!-- Tab 2: Drive & Route Sheet -->
+      <div class="tab-pane" id="pane-route">
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label">ルートタイトル</label>
+            <div class="form-label-actions">
+              <button type="button" class="btn-text-action" id="btnLoadRouteSample" title="ドライブ旅程のサンプルを読み込みます">💡 サンプル旅程読込</button>
+            </div>
+          </div>
+          <input type="text" id="routeTitle" class="input-text" value="🚗 週末ドライブ旅">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">移動手段</label>
+          <div class="route-mode-selector">
+            <button type="button" class="route-mode-chip active" data-mode="driving">🚗 車</button>
+            <button type="button" class="route-mode-chip" data-mode="bicycling">🚲 自転車</button>
+            <button type="button" class="route-mode-chip" data-mode="walking">🚶 徒歩</button>
+            <button type="button" class="route-mode-chip" data-mode="transit">🚃 電車・バス</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">経由地・目的地の追加</label>
+          <div class="route-input-card">
+            <div class="route-input-row">
+              <input type="text" id="routeSpotName" class="input-text" placeholder="スポット名 (例: 海老名SA、熱海サンビーチ)">
+            </div>
+            <div class="route-input-row">
+              <input type="text" id="routeSpotLocation" class="input-text" placeholder="住所・施設名 (空欄ならスポット名を使用)">
+            </div>
+            <div class="route-input-row">
+              <input type="text" id="routeSpotNote" class="input-text" placeholder="予定・メモ (例: 09:30 集合・給油、名物ソフト)">
+            </div>
+            <div class="route-input-actions-row">
+              <div class="route-action-radio">
+                <label><input type="radio" name="routeActionType" value="navigate" checked> 🚀 直接ナビ起動</label>
+                <label><input type="radio" name="routeActionType" value="search"> 📍 地図・スポット詳細</label>
+              </div>
+              <button class="btn-secondary" id="btnAddRouteSpot">スポット追加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Route stops list -->
+        <div class="form-group">
+          <div class="form-label-row">
+            <label class="form-label">立ち寄り順リスト（印刷時にQRコード付きで印字）</label>
+            <div class="form-label-actions">
+              <button type="button" class="btn-text-action" id="btnClearCompletedRoutes" title="チェック済みの項目を削除">✓ 完了分削除</button>
+              <button type="button" class="btn-text-action danger" id="btnClearAllRoutes" title="すべての項目を削除">🗑️ 全削除</button>
+            </div>
+          </div>
+          <div class="route-list" id="routeList">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Free Text & Notes -->
       <div class="tab-pane" id="pane-text">
         <div class="form-group">
           <div class="form-label-row">

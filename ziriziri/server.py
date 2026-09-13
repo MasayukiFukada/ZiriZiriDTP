@@ -11,6 +11,7 @@ from ziriziri.config import STATIC_DIR
 from ziriziri.driver import PrinterDriver
 from ziriziri.renderer import (
     render_todo_receipt,
+    render_route_sheet,
     render_free_text,
     render_image_dither,
     render_test_chart,
@@ -52,6 +53,26 @@ class TodoRequest(BaseModel):
     title: str = "TODO LIST"
     items: List[TodoItem]
     footer: Optional[str] = "ZiriZiriDTP * SWS-PT1"
+    show_datetime: bool = True
+    datetime_position: str = "header"  # "header" or "footer"
+    show_cut_line: bool = True
+    density: int = 1
+    feed: int = 40
+
+
+class RouteItem(BaseModel):
+    name: str
+    location: Optional[str] = None
+    note: Optional[str] = None
+    checked: bool = False
+    action: str = "navigate"  # "navigate" or "search"
+
+
+class RouteRequest(BaseModel):
+    title: str = "🚗 ドライブルート"
+    items: List[RouteItem]
+    travel_mode: str = "driving"  # "driving", "bicycling", "walking", "transit"
+    footer: Optional[str] = "ZiriZiriDTP * Safe Trip!"
     show_datetime: bool = True
     datetime_position: str = "header"  # "header" or "footer"
     show_cut_line: bool = True
@@ -126,6 +147,43 @@ async def print_todo(req: TodoRequest):
     )
     if req.show_cut_line:
         img = append_cut_line(img)
+    chunks = pil_to_chunks(img)
+    success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
+    if not success:
+        raise HTTPException(
+            status_code=503,
+            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
+        )
+    return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
+
+
+@app.post("/api/preview/route")
+async def preview_route(req: RouteRequest):
+    """Generate preview image for travel/drive route sheet."""
+    img = render_route_sheet(
+        title=req.title,
+        items=[itm.model_dump() for itm in req.items],
+        travel_mode=req.travel_mode,
+        footer_text=req.footer,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
+        show_cut_line=req.show_cut_line,
+    )
+    return {"preview": image_to_base64_png(img), "height": img.height}
+
+
+@app.post("/api/print/route")
+async def print_route(req: RouteRequest):
+    """Render and print travel/drive route sheet."""
+    img = render_route_sheet(
+        title=req.title,
+        items=[itm.model_dump() for itm in req.items],
+        travel_mode=req.travel_mode,
+        footer_text=req.footer,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
+        show_cut_line=req.show_cut_line,
+    )
     chunks = pil_to_chunks(img)
     success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
     if not success:

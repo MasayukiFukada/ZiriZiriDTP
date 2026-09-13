@@ -12,6 +12,32 @@ document.addEventListener("DOMContentLoaded", () => {
   let debounceTimer = null;
   let selectedImageFile = null;
 
+  // Route State
+  let routeMode = localStorage.getItem("ziriziri_route_mode") || "driving";
+  let routeItems = JSON.parse(localStorage.getItem("ziriziri_route_items") || "null") || [
+    {
+      name: "海老名SA",
+      location: "海老名SA 下り",
+      note: "09:30 集合・朝食・給油",
+      checked: false,
+      action: "navigate",
+    },
+    {
+      name: "大観山展望台",
+      location: "アネスト岩田 スカイラウンジ",
+      note: "絶景フォトスポット＆休憩",
+      checked: false,
+      action: "navigate",
+    },
+    {
+      name: "修善寺温泉 街歩き",
+      location: "修善寺温泉 竹林の小径",
+      note: "温泉街散策とお昼ご飯",
+      checked: false,
+      action: "search",
+    },
+  ];
+
   // DOM Elements
   const tabs = document.querySelectorAll(".tab-btn");
   const tabPanes = document.querySelectorAll(".tab-pane");
@@ -22,6 +48,18 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusBadge = document.getElementById("statusBadge");
   const statusText = document.getElementById("statusText");
   const statusDot = document.getElementById("statusDot");
+
+  // Route Elements
+  const routeTitle = document.getElementById("routeTitle");
+  const btnLoadRouteSample = document.getElementById("btnLoadRouteSample");
+  const routeModeChips = document.querySelectorAll(".route-mode-chip");
+  const routeSpotName = document.getElementById("routeSpotName");
+  const routeSpotLocation = document.getElementById("routeSpotLocation");
+  const routeSpotNote = document.getElementById("routeSpotNote");
+  const btnAddRouteSpot = document.getElementById("btnAddRouteSpot");
+  const btnClearCompletedRoutes = document.getElementById("btnClearCompletedRoutes");
+  const btnClearAllRoutes = document.getElementById("btnClearAllRoutes");
+  const routeList = document.getElementById("routeList");
 
   // TODO elements
   const todoTitle = document.getElementById("todoTitle");
@@ -85,6 +123,17 @@ document.addEventListener("DOMContentLoaded", () => {
   const savedTodoTitle = localStorage.getItem("ziriziri_todo_title");
   if (savedTodoTitle !== null) {
     todoTitle.value = savedTodoTitle;
+  }
+
+  // Route Title & Mode
+  const savedRouteTitle = localStorage.getItem("ziriziri_route_title");
+  if (savedRouteTitle !== null && routeTitle) {
+    routeTitle.value = savedRouteTitle;
+  }
+  if (routeModeChips && routeModeChips.length > 0) {
+    routeModeChips.forEach((chip) => {
+      chip.classList.toggle("active", chip.dataset.mode === routeMode);
+    });
   }
 
   // Free Text & Text Options
@@ -161,6 +210,268 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Apply initial active tab
   switchTab(currentTab);
+
+  // ─────────────────────────────────────────────────────────
+  // Route Management & Navigation Actions
+  // ─────────────────────────────────────────────────────────
+  function saveRoutes() {
+    localStorage.setItem("ziriziri_route_items", JSON.stringify(routeItems));
+  }
+
+  function renderRouteList() {
+    if (!routeList) return;
+    routeList.innerHTML = "";
+
+    if (routeItems.length === 0) {
+      const emptyDiv = document.createElement("div");
+      emptyDiv.className = "todo-empty-state";
+      emptyDiv.textContent = "📍 経由地・目的地がまだありません。「スポット追加」から登録してください。";
+      routeList.appendChild(emptyDiv);
+      return;
+    }
+
+    routeItems.forEach((itm, idx) => {
+      const card = document.createElement("div");
+      card.className = `route-item-card ${itm.checked ? "checked" : ""}`;
+
+      // Step Number
+      const stepBadge = document.createElement("div");
+      stepBadge.className = "route-step-num";
+      stepBadge.textContent = `[${String(idx + 1).padStart(2, "0")}]`;
+
+      // Checkbox
+      const chk = document.createElement("input");
+      chk.type = "checkbox";
+      chk.className = "route-item-checkbox";
+      chk.checked = !!itm.checked;
+      chk.addEventListener("change", () => {
+        itm.checked = chk.checked;
+        saveRoutes();
+        card.classList.toggle("checked", chk.checked);
+        requestPreview();
+      });
+
+      // Body (name, note, tag)
+      const body = document.createElement("div");
+      body.className = "route-item-body";
+
+      const nameDiv = document.createElement("div");
+      nameDiv.className = "route-item-name";
+      nameDiv.textContent = itm.name;
+      body.appendChild(nameDiv);
+
+      if (itm.note) {
+        const noteDiv = document.createElement("div");
+        noteDiv.className = "route-item-note";
+        noteDiv.textContent = itm.note;
+        body.appendChild(noteDiv);
+      }
+
+      const metaDiv = document.createElement("div");
+      metaDiv.className = "route-item-meta";
+
+      const tag = document.createElement("span");
+      tag.className = `route-item-tag ${itm.action === "navigate" ? "nav" : "search"}`;
+      tag.textContent = itm.action === "navigate" ? "🚀 ナビ直通" : "📍 地図詳細";
+      metaDiv.appendChild(tag);
+
+      if (itm.location && itm.location !== itm.name) {
+        const locSpan = document.createElement("span");
+        locSpan.className = "route-item-note";
+        locSpan.textContent = `(${itm.location})`;
+        metaDiv.appendChild(locSpan);
+      }
+
+      body.appendChild(metaDiv);
+
+      // Actions (Move Up, Move Down, Delete)
+      const actions = document.createElement("div");
+      actions.className = "route-item-actions";
+
+      if (idx > 0) {
+        const btnUp = document.createElement("button");
+        btnUp.type = "button";
+        btnUp.className = "btn-icon-sm";
+        btnUp.title = "上へ移動";
+        btnUp.textContent = "▲";
+        btnUp.addEventListener("click", () => {
+          const temp = routeItems[idx - 1];
+          routeItems[idx - 1] = routeItems[idx];
+          routeItems[idx] = temp;
+          saveRoutes();
+          renderRouteList();
+          requestPreview();
+        });
+        actions.appendChild(btnUp);
+      }
+
+      if (idx < routeItems.length - 1) {
+        const btnDown = document.createElement("button");
+        btnDown.type = "button";
+        btnDown.className = "btn-icon-sm";
+        btnDown.title = "下へ移動";
+        btnDown.textContent = "▼";
+        btnDown.addEventListener("click", () => {
+          const temp = routeItems[idx + 1];
+          routeItems[idx + 1] = routeItems[idx];
+          routeItems[idx] = temp;
+          saveRoutes();
+          renderRouteList();
+          requestPreview();
+        });
+        actions.appendChild(btnDown);
+      }
+
+      const btnDel = document.createElement("button");
+      btnDel.type = "button";
+      btnDel.className = "btn-icon-sm danger";
+      btnDel.title = "削除";
+      btnDel.textContent = "✕";
+      btnDel.addEventListener("click", () => {
+        routeItems.splice(idx, 1);
+        saveRoutes();
+        renderRouteList();
+        requestPreview();
+      });
+      actions.appendChild(btnDel);
+
+      card.appendChild(stepBadge);
+      card.appendChild(chk);
+      card.appendChild(body);
+      card.appendChild(actions);
+
+      routeList.appendChild(card);
+    });
+  }
+
+  // Route Title input
+  if (routeTitle) {
+    routeTitle.addEventListener("input", () => {
+      localStorage.setItem("ziriziri_route_title", routeTitle.value);
+      requestPreview();
+    });
+  }
+
+  // Route Mode selection
+  if (routeModeChips && routeModeChips.length > 0) {
+    routeModeChips.forEach((chip) => {
+      chip.addEventListener("click", () => {
+        routeMode = chip.dataset.mode;
+        localStorage.setItem("ziriziri_route_mode", routeMode);
+        routeModeChips.forEach((c) => c.classList.toggle("active", c === chip));
+        requestPreview();
+      });
+    });
+  }
+
+  // Add Route Spot
+  function addRouteSpot() {
+    const name = routeSpotName ? routeSpotName.value.trim() : "";
+    if (!name) {
+      if (routeSpotName) routeSpotName.focus();
+      return;
+    }
+    const location = (routeSpotLocation && routeSpotLocation.value.trim()) || name;
+    const note = routeSpotNote ? routeSpotNote.value.trim() : "";
+    const actionRadio = document.querySelector('input[name="routeActionType"]:checked');
+    const action = actionRadio ? actionRadio.value : "navigate";
+
+    routeItems.push({
+      name,
+      location,
+      note,
+      checked: false,
+      action,
+    });
+
+    saveRoutes();
+    renderRouteList();
+    requestPreview();
+
+    if (routeSpotName) routeSpotName.value = "";
+    if (routeSpotLocation) routeSpotLocation.value = "";
+    if (routeSpotNote) routeSpotNote.value = "";
+    if (routeSpotName) routeSpotName.focus();
+  }
+
+  if (btnAddRouteSpot) {
+    btnAddRouteSpot.addEventListener("click", addRouteSpot);
+  }
+  if (routeSpotName) {
+    routeSpotName.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addRouteSpot();
+      }
+    });
+  }
+
+  // Clear completed / all
+  if (btnClearCompletedRoutes) {
+    btnClearCompletedRoutes.addEventListener("click", () => {
+      routeItems = routeItems.filter((itm) => !itm.checked);
+      saveRoutes();
+      renderRouteList();
+      requestPreview();
+    });
+  }
+  if (btnClearAllRoutes) {
+    btnClearAllRoutes.addEventListener("click", () => {
+      if (confirm("ルート上のすべてのスポットを削除しますか？")) {
+        routeItems = [];
+        saveRoutes();
+        renderRouteList();
+        requestPreview();
+      }
+    });
+  }
+
+  // Load sample itinerary
+  if (btnLoadRouteSample) {
+    btnLoadRouteSample.addEventListener("click", () => {
+      routeTitle.value = "🚗 伊豆スカイライン ドライブ";
+      localStorage.setItem("ziriziri_route_title", routeTitle.value);
+      routeMode = "driving";
+      localStorage.setItem("ziriziri_route_mode", routeMode);
+      routeModeChips.forEach((c) => c.classList.toggle("active", c.dataset.mode === "driving"));
+
+      routeItems = [
+        {
+          name: "海老名SA 下り",
+          location: "海老名SA 下り",
+          note: "09:00 集合・給油・朝食",
+          checked: false,
+          action: "navigate",
+        },
+        {
+          name: "アネスト岩田 スカイラウンジ",
+          location: "アネスト岩田スカイラウンジ 大観山",
+          note: "富士山と芦ノ湖の絶景休憩",
+          checked: false,
+          action: "navigate",
+        },
+        {
+          name: "修善寺温泉 街歩き",
+          location: "修善寺温泉",
+          note: "温泉街散策・お昼ごはん",
+          checked: false,
+          action: "search",
+        },
+        {
+          name: "熱海サンビーチ",
+          location: "熱海サンビーチ",
+          note: "海沿いドライブ＆おみやげ",
+          checked: false,
+          action: "navigate",
+        },
+      ];
+      saveRoutes();
+      renderRouteList();
+      requestPreview();
+    });
+  }
+
+  renderRouteList();
 
   // ─────────────────────────────────────────────────────────
   // TODO Management & QR Attachment
@@ -460,6 +771,23 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.preview) previewImg.src = data.preview;
 
+      } else if (currentTab === "route") {
+        const payload = {
+          title: routeTitle ? (routeTitle.value || "🚗 ドライブルート") : "🚗 ドライブルート",
+          items: routeItems,
+          travel_mode: routeMode,
+          show_datetime: showDate,
+          datetime_position: datePos,
+          show_cut_line: showCut,
+        };
+        const res = await fetch("/api/preview/route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.preview) previewImg.src = data.preview;
+
       } else if (currentTab === "text") {
         const payload = {
           text: freeText.value || " ",
@@ -539,6 +867,21 @@ document.addEventListener("DOMContentLoaded", () => {
           body: JSON.stringify({
             title: todoTitle.value || "TODO LIST",
             items: todoItems,
+            show_datetime: showDate,
+            datetime_position: datePos,
+            show_cut_line: showCut,
+            density,
+            feed,
+          }),
+        });
+      } else if (currentTab === "route") {
+        res = await fetch("/api/print/route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: routeTitle ? (routeTitle.value || "🚗 ドライブルート") : "🚗 ドライブルート",
+            items: routeItems,
+            travel_mode: routeMode,
             show_datetime: showDate,
             datetime_position: datePos,
             show_cut_line: showCut,
