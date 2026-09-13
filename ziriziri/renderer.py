@@ -6,9 +6,46 @@ from itertools import islice
 from typing import List, Optional
 from datetime import datetime
 
+import qrcode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from ziriziri.config import PRINTER_WIDTH, DEFAULT_FONT_PATH, FALLBACK_FONT_PATH
+
+
+def make_todo_qr(data: str, max_size: int = 115) -> Image.Image:
+    """Generate 1-bit QR code optimized for thermal receipt items."""
+    for bs in [3, 2]:
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=bs,
+            border=2,
+        )
+        qr.add_data(data)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white").convert("1")
+        if img.width <= max_size:
+            return img
+    if img.width > max_size:
+        img = img.resize((max_size, max_size), Image.Resampling.NEAREST)
+    return img
+
+
+def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int) -> List[str]:
+    """Wrap text into multiple lines fitting within max_width."""
+    lines = []
+    current = ""
+    for char in text:
+        test = current + char
+        bbox = font.getbbox(test)
+        if (bbox[2] - bbox[0]) > max_width and current:
+            lines.append(current)
+            current = char
+        else:
+            current = test
+    if current:
+        lines.append(current)
+    return lines or [""]
 
 
 def get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
@@ -104,7 +141,7 @@ def render_todo_receipt(
     show_datetime: bool = True,
     datetime_position: str = "header",
 ) -> Image.Image:
-    """Render receipt style TODO / Shopping list with optional timestamp."""
+    """Render receipt style TODO / Shopping list with optional QR codes and timestamp."""
     items = items or []
     w = PRINTER_WIDTH
     font_title = get_font(26, bold=True)
@@ -114,11 +151,63 @@ def render_todo_receipt(
 
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # Estimate height
-    line_h = 32
+    # Pre-process items and calculate layout
+    rendered_items = []
+    total_items_h = 0
+
+    for itm in items:
+        checked = itm.get("checked", False)
+        text = itm.get("text", "")
+        qr_type = itm.get("qr_type")
+        qr_data = (itm.get("qr_data") or "").strip()
+
+        qr_img = None
+        if qr_data:
+            try:
+                qr_img = make_todo_qr(qr_data, max_size=110)
+            except Exception:
+                qr_img = None
+
+        if qr_img:
+            # Layout with QR on right: Left max_width 205px
+            text_lines = wrap_text(text, font_item, max_width=205)
+            badge_label = ""
+            if qr_type == "url":
+                badge_label = "[URL]"
+            elif qr_type == "map":
+                badge_label = "[地図]"
+            elif qr_type == "memo":
+                badge_label = "[メモ]"
+
+            text_h = len(text_lines) * 22 + (16 if badge_label else 0) + 8
+            qr_h = qr_img.height
+            item_h = max(text_h, qr_h + 12, 44)
+            rendered_items.append({
+                "checked": checked,
+                "text_lines": text_lines,
+                "badge_label": badge_label,
+                "qr_img": qr_img,
+                "height": item_h,
+            })
+            total_items_h += item_h
+        else:
+            text_lines = wrap_text(text, font_item, max_width=315)
+            item_h = max(32, len(text_lines) * 22 + 10)
+            rendered_items.append({
+                "checked": checked,
+                "text_lines": text_lines,
+                "badge_label": "",
+                "qr_img": None,
+                "height": item_h,
+            })
+            total_items_h += item_h
+
+    if not rendered_items:
+        total_items_h = 32
+
     header_h = 80 if (show_datetime and datetime_position == "header") else 60
     footer_h = 60 if (show_datetime and datetime_position == "footer") else 46
-    total_h = header_h + max(1, len(items)) * line_h + footer_h
+    total_h = header_h + total_items_h + footer_h
     if total_h % 2 != 0:
         total_h += 1
 
@@ -143,9 +232,12 @@ def render_todo_receipt(
 
     # Items
     y = sep_y + 12
-    for itm in items:
-        checked = itm.get("checked", False)
-        text = itm.get("text", "")
+    for itm in rendered_items:
+        checked = itm["checked"]
+        text_lines = itm["text_lines"]
+        badge = itm["badge_label"]
+        qr_img = itm["qr_img"]
+        item_h = itm["height"]
 
         # Checkbox square (16x16)
         bx, by = 20, y + 4
@@ -153,14 +245,32 @@ def render_todo_receipt(
         if checked:
             draw.line([(bx + 3, by + 8), (bx + 7, by + 13)], fill=0, width=2)
             draw.line([(bx + 7, by + 13), (bx + 14, by + 3)], fill=0, width=2)
-            draw.text((45, y + 2), text, font=font_item, fill=0)
-            text_bbox = draw.textbbox((45, y + 2), text, font=font_item)
-            strike_y = (text_bbox[1] + text_bbox[3]) // 2
-            draw.line([(42, strike_y), (text_bbox[2] + 4, strike_y)], fill=0, width=1)
-        else:
-            draw.text((45, y + 2), text, font=font_item, fill=0)
 
-        y += line_h
+        # Text lines
+        ty = y + 2
+        for line in text_lines:
+            draw.text((45, ty), line, font=font_item, fill=0)
+            if checked:
+                text_bbox = draw.textbbox((45, ty), line, font=font_item)
+                strike_y = (text_bbox[1] + text_bbox[3]) // 2
+                draw.line([(42, strike_y), (text_bbox[2] + 4, strike_y)], fill=0, width=1)
+            ty += 22
+
+        if badge:
+            draw.text((45, ty + 1), badge, font=font_sub, fill=0)
+
+        # QR code on the right side
+        if qr_img:
+            qr_x = w - 16 - qr_img.width
+            qr_y = y + (item_h - qr_img.height) // 2
+            img.paste(qr_img, (qr_x, qr_y))
+
+            # Draw subtle dotted separator below QR items
+            sep_line_y = y + item_h - 2
+            for sx in range(16, w - 16, 5):
+                draw.line([(sx, sep_line_y), (sx + 2, sep_line_y)], fill=0, width=1)
+
+        y += item_h
 
     # Footer separator
     draw.line([(12, y + 6), (w - 12, y + 6)], fill=0, width=1)

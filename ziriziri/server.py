@@ -44,6 +44,8 @@ driver = PrinterDriver()
 class TodoItem(BaseModel):
     text: str
     checked: bool = False
+    qr_type: Optional[str] = None  # "url", "map", "memo", None
+    qr_data: Optional[str] = None
 
 
 class TodoRequest(BaseModel):

@@ -475,3 +475,100 @@ body {
   font-size: 1.1rem;
   font-weight: 600;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   QR Code Attachment UI
+   ───────────────────────────────────────────────────────────── */
+.qr-attach-panel {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.qr-preset-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.qr-preset-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.qr-preset-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.qr-preset-chip.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(255, 94, 58, 0.35);
+}
+
+.qr-input-wrap {
+  display: flex;
+  width: 100%;
+}
+
+.qr-input-wrap .input-text {
+  width: 100%;
+  font-size: 0.85rem;
+  padding: 8px 10px;
+}
+
+.qr-guide-tooltip {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  padding: 2px 4px;
+}
+
+/* QR Badge inside TODO Item */
+.todo-qr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 94, 58, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(255, 94, 58, 0.3);
+  border-radius: var(--radius-full);
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.todo-qr-badge:hover {
+  background: var(--accent);
+  color: #fff;
+}

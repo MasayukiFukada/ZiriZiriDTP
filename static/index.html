@@ -55,10 +55,30 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">アイテム追加</label>
+          <div class="form-label-row">
+            <label class="form-label">アイテム追加</label>
+            <button type="button" class="btn-text-action" id="btnToggleQrInput" title="QRコード情報を追加">
+              <span id="qrToggleIcon">＋</span> QR情報を添える
+            </button>
+          </div>
           <div class="add-bar">
             <input type="text" id="todoInput" class="input-text" placeholder="例: 牛乳、たまご、感熱紙">
             <button class="btn-secondary" id="btnAddTodo">追加</button>
+          </div>
+
+          <!-- QR Attachment Panel -->
+          <div class="qr-attach-panel" id="qrAttachPanel" style="display:none;">
+            <div class="qr-preset-tabs">
+              <button type="button" class="qr-preset-chip active" data-type="url">🔗 URL</button>
+              <button type="button" class="qr-preset-chip" data-type="map">📍 地図</button>
+              <button type="button" class="qr-preset-chip" data-type="memo">📝 メモ</button>
+            </div>
+            <div class="qr-input-wrap">
+              <input type="text" id="todoQrData" class="input-text" placeholder="https://...（商品ページ・クラファン・レシピ等）">
+            </div>
+            <div class="qr-guide-tooltip" id="qrGuideTooltip">
+              💡 商品詳細やレシピ動画のURLを入れておくと、売り場でスマホから即開けます
+            </div>
           </div>
         </div>
 

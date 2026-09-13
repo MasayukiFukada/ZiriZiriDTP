@@ -31,6 +31,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnClearCompletedTodos = document.getElementById("btnClearCompletedTodos");
   const btnClearAllTodos = document.getElementById("btnClearAllTodos");
 
+  // QR Attachment elements
+  const btnToggleQrInput = document.getElementById("btnToggleQrInput");
+  const qrToggleIcon = document.getElementById("qrToggleIcon");
+  const qrAttachPanel = document.getElementById("qrAttachPanel");
+  const qrPresetChips = document.querySelectorAll(".qr-preset-chip");
+  const todoQrData = document.getElementById("todoQrData");
+  const qrGuideTooltip = document.getElementById("qrGuideTooltip");
+
+  let activeQrType = "url";
+  const qrPresets = {
+    url: {
+      placeholder: "https://...（商品ページ・クラファン・レシピ等）",
+      tooltip: "💡 商品詳細やレシピ動画のURLを入れておくと、売り場でスマホから即開けます",
+      badge: "🔗 URL",
+    },
+    map: {
+      placeholder: "https://maps.app.goo.gl/... または 住所・店名",
+      tooltip: "💡 Googleマップの共有URLや住所を入れると、スキャンしてすぐルート案内が始まります",
+      badge: "📍 地図",
+    },
+    memo: {
+      placeholder: "例: E26口金・60W形相当、カーテン幅100丈198cm、足24.5cm",
+      tooltip: "💡 長文の型番やサイズ控えを入れておくと、紙面を圧迫せずスマホで正確にコピーできます",
+      badge: "📝 メモ",
+    },
+  };
+
   // Text elements
   const freeText = document.getElementById("freeText");
   const textSize = document.getElementById("textSize");
@@ -136,11 +163,37 @@ document.addEventListener("DOMContentLoaded", () => {
   switchTab(currentTab);
 
   // ─────────────────────────────────────────────────────────
-  // TODO Management
+  // TODO Management & QR Attachment
   // ─────────────────────────────────────────────────────────
   function saveTodos() {
     localStorage.setItem("ziriziri_todos", JSON.stringify(todoItems));
   }
+
+  // QR Panel toggle & preset events
+  if (btnToggleQrInput && qrAttachPanel) {
+    btnToggleQrInput.addEventListener("click", () => {
+      const isHidden = qrAttachPanel.style.display === "none";
+      qrAttachPanel.style.display = isHidden ? "flex" : "none";
+      qrToggleIcon.textContent = isHidden ? "✕" : "＋";
+      if (isHidden && todoQrData) {
+        todoQrData.focus();
+      }
+    });
+  }
+
+  qrPresetChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      qrPresetChips.forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      activeQrType = chip.dataset.type;
+      const preset = qrPresets[activeQrType];
+      if (preset && todoQrData) {
+        todoQrData.placeholder = preset.placeholder;
+        if (qrGuideTooltip) qrGuideTooltip.textContent = preset.tooltip;
+        todoQrData.focus();
+      }
+    });
+  });
 
   function renderTodoList() {
     todoList.innerHTML = "";
@@ -169,6 +222,26 @@ document.addEventListener("DOMContentLoaded", () => {
       left.appendChild(cb);
       left.appendChild(span);
 
+      // QR Badge if attached
+      if (itm.qr_data) {
+        const badge = document.createElement("span");
+        badge.className = "todo-qr-badge";
+        const preset = qrPresets[itm.qr_type] || { badge: "QR" };
+        badge.textContent = preset.badge;
+        badge.title = `QR内容: ${itm.qr_data}\n（タップでQRを解除）`;
+        badge.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (confirm(`この項目のQRコード情報を削除しますか？\n\n種別: ${preset.badge}\n内容: ${itm.qr_data}`)) {
+            delete itm.qr_type;
+            delete itm.qr_data;
+            saveTodos();
+            renderTodoList();
+            requestPreview();
+          }
+        });
+        left.appendChild(badge);
+      }
+
       const btnDel = document.createElement("button");
       btnDel.className = "btn-delete";
       btnDel.innerHTML = "✕";
@@ -189,10 +262,32 @@ document.addEventListener("DOMContentLoaded", () => {
   function addTodoItem(text) {
     const trimmed = text.trim();
     if (!trimmed) return;
-    todoItems.push({ text: trimmed, checked: false });
+
+    let qr_type = null;
+    let qr_data = null;
+    if (qrAttachPanel && qrAttachPanel.style.display !== "none" && todoQrData) {
+      const qd = todoQrData.value.trim();
+      if (qd) {
+        qr_type = activeQrType;
+        qr_data = qd;
+      }
+    }
+
+    todoItems.push({
+      text: trimmed,
+      checked: false,
+      qr_type: qr_type,
+      qr_data: qr_data,
+    });
+
     saveTodos();
     renderTodoList();
     requestPreview();
+
+    // Clear QR data input after adding
+    if (todoQrData) {
+      todoQrData.value = "";
+    }
   }
 
   btnAddTodo.addEventListener("click", () => {
@@ -207,6 +302,15 @@ document.addEventListener("DOMContentLoaded", () => {
       todoInput.value = "";
     }
   });
+
+  if (todoQrData) {
+    todoQrData.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        addTodoItem(todoInput.value);
+        todoInput.value = "";
+      }
+    });
+  }
 
   todoTitle.addEventListener("input", () => {
     localStorage.setItem("ziriziri_todo_title", todoTitle.value);
