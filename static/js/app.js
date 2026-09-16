@@ -1,20 +1,22 @@
 // ZiriZiriDTP Client Application Logic
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // 1. Migrate legacy data from localStorage if existing
+  await migrateFromLocalStorage();
+
   // State
   let currentTab = "todo";
-  let todoItems = JSON.parse(localStorage.getItem("ziriziri_todos") || "null") || [
+  let debounceTimer = null;
+  let selectedImageFile = null;
+
+  const defaultTodos = [
     { text: "牛乳 1本", checked: false },
     { text: "食パン (6枚切り)", checked: false },
     { text: "たまご 1パック", checked: true },
     { text: "感熱ロール紙 予備", checked: false },
   ];
-  let debounceTimer = null;
-  let selectedImageFile = null;
 
-  // Route State
-  let routeMode = localStorage.getItem("ziriziri_route_mode") || "driving";
-  let routeItems = JSON.parse(localStorage.getItem("ziriziri_route_items") || "null") || [
+  const defaultRoutes = [
     {
       name: "海老名SA",
       location: "海老名SA 下り",
@@ -37,6 +39,10 @@ document.addEventListener("DOMContentLoaded", () => {
       action: "search",
     },
   ];
+
+  let todoItems = (await dbGet("ziriziri_todos")) || defaultTodos;
+  let routeMode = (await dbGet("ziriziri_route_mode")) || "driving";
+  let routeItems = (await dbGet("ziriziri_route_items")) || defaultRoutes;
 
   // DOM Elements
   const tabs = document.querySelectorAll(".tab-btn");
@@ -116,17 +122,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const selDatePos = document.getElementById("selDatePos");
   const chkCutLine = document.getElementById("chkCutLine");
 
+  // Backup / Restore elements
+  const btnExportJson = document.getElementById("btnExportJson");
+  const btnImportJson = document.getElementById("btnImportJson");
+  const fileImportJson = document.getElementById("fileImportJson");
+
   // ─────────────────────────────────────────────────────────
-  // Restore State from LocalStorage
+  // Restore State from IndexedDB
   // ─────────────────────────────────────────────────────────
   // TODO Title
-  const savedTodoTitle = localStorage.getItem("ziriziri_todo_title");
-  if (savedTodoTitle !== null) {
+  const savedTodoTitle = await dbGet("ziriziri_todo_title");
+  if (savedTodoTitle !== null && todoTitle) {
     todoTitle.value = savedTodoTitle;
   }
 
   // Route Title & Mode
-  const savedRouteTitle = localStorage.getItem("ziriziri_route_title");
+  const savedRouteTitle = await dbGet("ziriziri_route_title");
   if (savedRouteTitle !== null && routeTitle) {
     routeTitle.value = savedRouteTitle;
   }
@@ -137,66 +148,107 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Free Text & Text Options
-  const savedMemoText = localStorage.getItem("ziriziri_memo_text");
-  if (savedMemoText !== null) {
+  const savedMemoText = await dbGet("ziriziri_memo_text");
+  if (savedMemoText !== null && freeText) {
     freeText.value = savedMemoText;
   }
-  const savedMemoSize = localStorage.getItem("ziriziri_memo_size");
-  if (savedMemoSize !== null) {
+  const savedMemoSize = await dbGet("ziriziri_memo_size");
+  if (savedMemoSize !== null && textSize) {
     textSize.value = savedMemoSize;
   }
-  const savedMemoAlign = localStorage.getItem("ziriziri_memo_align");
-  if (savedMemoAlign !== null) {
+  const savedMemoAlign = await dbGet("ziriziri_memo_align");
+  if (savedMemoAlign !== null && textAlign) {
     textAlign.value = savedMemoAlign;
   }
-  const savedMemoBold = localStorage.getItem("ziriziri_memo_bold");
-  if (savedMemoBold !== null) {
-    textBold.checked = savedMemoBold === "true";
+  const savedMemoBold = await dbGet("ziriziri_memo_bold");
+  if (savedMemoBold !== null && textBold) {
+    textBold.checked = savedMemoBold === true || savedMemoBold === "true";
   }
 
   // Print options
-  const savedShowDate = localStorage.getItem("ziriziri_opt_show_date");
-  if (savedShowDate !== null) chkShowDate.checked = savedShowDate === "true";
-  const savedDatePos = localStorage.getItem("ziriziri_opt_date_pos");
-  if (savedDatePos !== null) selDatePos.value = savedDatePos;
-  const savedCutLine = localStorage.getItem("ziriziri_opt_cut_line");
-  if (savedCutLine !== null) chkCutLine.checked = savedCutLine === "true";
-  const savedDensity = localStorage.getItem("ziriziri_opt_density");
-  if (savedDensity !== null) printDensity.value = savedDensity;
-  const savedFeed = localStorage.getItem("ziriziri_opt_feed");
-  if (savedFeed !== null) printFeed.value = savedFeed;
+  const savedShowDate = await dbGet("ziriziri_opt_show_date");
+  if (savedShowDate !== null && chkShowDate) chkShowDate.checked = savedShowDate === true || savedShowDate === "true";
+  const savedDatePos = await dbGet("ziriziri_opt_date_pos");
+  if (savedDatePos !== null && selDatePos) selDatePos.value = savedDatePos;
+  const savedCutLine = await dbGet("ziriziri_opt_cut_line");
+  if (savedCutLine !== null && chkCutLine) chkCutLine.checked = savedCutLine === true || savedCutLine === "true";
+  const savedDensity = await dbGet("ziriziri_opt_density");
+  if (savedDensity !== null && printDensity) printDensity.value = savedDensity;
+  const savedFeed = await dbGet("ziriziri_opt_feed");
+  if (savedFeed !== null && printFeed) printFeed.value = savedFeed;
 
   // Active Tab
-  const savedTab = localStorage.getItem("ziriziri_active_tab");
+  const savedTab = await dbGet("ziriziri_active_tab");
   if (savedTab && document.getElementById(`pane-${savedTab}`)) {
     currentTab = savedTab;
   }
 
-  chkShowDate.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_opt_show_date", chkShowDate.checked);
-    requestPreview();
-  });
-  selDatePos.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_opt_date_pos", selDatePos.value);
-    requestPreview();
-  });
-  chkCutLine.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_opt_cut_line", chkCutLine.checked);
-    requestPreview();
-  });
-  printDensity.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_opt_density", printDensity.value);
-  });
-  printFeed.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_opt_feed", printFeed.value);
-  });
+  if (chkShowDate) {
+    chkShowDate.addEventListener("change", () => {
+      dbSet("ziriziri_opt_show_date", chkShowDate.checked);
+      requestPreview();
+    });
+  }
+  if (selDatePos) {
+    selDatePos.addEventListener("change", () => {
+      dbSet("ziriziri_opt_date_pos", selDatePos.value);
+      requestPreview();
+    });
+  }
+  if (chkCutLine) {
+    chkCutLine.addEventListener("change", () => {
+      dbSet("ziriziri_opt_cut_line", chkCutLine.checked);
+      requestPreview();
+    });
+  }
+  if (printDensity) {
+    printDensity.addEventListener("change", () => {
+      dbSet("ziriziri_opt_density", printDensity.value);
+    });
+  }
+  if (printFeed) {
+    printFeed.addEventListener("change", () => {
+      dbSet("ziriziri_opt_feed", printFeed.value);
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Backup & Restore Events
+  // ─────────────────────────────────────────────────────────
+  if (btnExportJson) {
+    btnExportJson.addEventListener("click", () => {
+      exportBackupFile();
+    });
+  }
+  if (btnImportJson && fileImportJson) {
+    btnImportJson.addEventListener("click", () => {
+      fileImportJson.click();
+    });
+    fileImportJson.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const data = JSON.parse(evt.target.result);
+          await importBackupData(data);
+          alert("データを復元しました。画面を再読み込みします。");
+          window.location.reload();
+        } catch (err) {
+          alert("バックアップファイルの復元に失敗しました: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      fileImportJson.value = "";
+    });
+  }
 
   // ─────────────────────────────────────────────────────────
   // Tab Navigation
   // ─────────────────────────────────────────────────────────
   function switchTab(tabName) {
     currentTab = tabName;
-    localStorage.setItem("ziriziri_active_tab", tabName);
+    dbSet("ziriziri_active_tab", tabName);
     tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === tabName));
     tabPanes.forEach((p) => p.classList.toggle("active", p.id === `pane-${tabName}`));
     requestPreview();
@@ -215,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Route Management & Navigation Actions
   // ─────────────────────────────────────────────────────────
   function saveRoutes() {
-    localStorage.setItem("ziriziri_route_items", JSON.stringify(routeItems));
+    dbSet("ziriziri_route_items", routeItems);
   }
 
   function renderRouteList() {
@@ -347,7 +399,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Route Title input
   if (routeTitle) {
     routeTitle.addEventListener("input", () => {
-      localStorage.setItem("ziriziri_route_title", routeTitle.value);
+      dbSet("ziriziri_route_title", routeTitle.value);
       requestPreview();
     });
   }
@@ -357,7 +409,7 @@ document.addEventListener("DOMContentLoaded", () => {
     routeModeChips.forEach((chip) => {
       chip.addEventListener("click", () => {
         routeMode = chip.dataset.mode;
-        localStorage.setItem("ziriziri_route_mode", routeMode);
+        dbSet("ziriziri_route_mode", routeMode);
         routeModeChips.forEach((c) => c.classList.toggle("active", c === chip));
         requestPreview();
       });
@@ -430,9 +482,9 @@ document.addEventListener("DOMContentLoaded", () => {
   if (btnLoadRouteSample) {
     btnLoadRouteSample.addEventListener("click", () => {
       routeTitle.value = "🚗 伊豆スカイライン ドライブ";
-      localStorage.setItem("ziriziri_route_title", routeTitle.value);
+      dbSet("ziriziri_route_title", routeTitle.value);
       routeMode = "driving";
-      localStorage.setItem("ziriziri_route_mode", routeMode);
+      dbSet("ziriziri_route_mode", routeMode);
       routeModeChips.forEach((c) => c.classList.toggle("active", c.dataset.mode === "driving"));
 
       routeItems = [
@@ -477,7 +529,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // TODO Management & QR Attachment
   // ─────────────────────────────────────────────────────────
   function saveTodos() {
-    localStorage.setItem("ziriziri_todos", JSON.stringify(todoItems));
+    dbSet("ziriziri_todos", todoItems);
   }
 
   // QR Panel toggle & preset events
@@ -624,7 +676,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   todoTitle.addEventListener("input", () => {
-    localStorage.setItem("ziriziri_todo_title", todoTitle.value);
+    dbSet("ziriziri_todo_title", todoTitle.value);
     requestPreview();
   });
 
@@ -655,22 +707,22 @@ document.addEventListener("DOMContentLoaded", () => {
   // Text & Image Controls Events
   // ─────────────────────────────────────────────────────────
   freeText.addEventListener("input", () => {
-    localStorage.setItem("ziriziri_memo_text", freeText.value);
+    dbSet("ziriziri_memo_text", freeText.value);
     requestPreview();
   });
 
   textSize.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_memo_size", textSize.value);
+    dbSet("ziriziri_memo_size", textSize.value);
     requestPreview();
   });
 
   textAlign.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_memo_align", textAlign.value);
+    dbSet("ziriziri_memo_align", textAlign.value);
     requestPreview();
   });
 
   textBold.addEventListener("change", () => {
-    localStorage.setItem("ziriziri_memo_bold", textBold.checked);
+    dbSet("ziriziri_memo_bold", textBold.checked);
     requestPreview();
   });
 
@@ -682,7 +734,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       if (btnClearText.dataset.mode === "undo" && lastClearedText !== null) {
         freeText.value = lastClearedText;
-        localStorage.setItem("ziriziri_memo_text", lastClearedText);
+        dbSet("ziriziri_memo_text", lastClearedText);
         btnClearText.textContent = "🗑️ クリア";
         btnClearText.classList.add("danger");
         delete btnClearText.dataset.mode;
@@ -700,7 +752,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       lastClearedText = freeText.value;
       freeText.value = "";
-      localStorage.setItem("ziriziri_memo_text", "");
+      dbSet("ziriziri_memo_text", "");
       requestPreview();
       freeText.focus();
 

@@ -273,6 +273,18 @@
             </select>
           </div>
         </div>
+
+        <!-- Data Management (IndexedDB Backup / Restore) -->
+        <div style="display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,0.02); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid var(--border-color); font-size:0.8rem; color:var(--text-secondary);">
+          <span style="display:flex; align-items:center; gap:6px;">
+            <span>🗄️ データ保存 (IndexedDB)</span>
+          </span>
+          <div style="display:flex; gap:8px;">
+            <button type="button" id="btnExportJson" class="btn-clear" style="padding:4px 8px; font-size:0.75rem;" title="入力したTODOやルート、メモをJSONファイルとしてダウンロードします">💾 バックアップ</button>
+            <button type="button" id="btnImportJson" class="btn-clear" style="padding:4px 8px; font-size:0.75rem;" title="バックアップしたJSONファイルからデータを復元します">📂 復元</button>
+            <input type="file" id="fileImportJson" accept=".json" style="display:none;">
+          </div>
+        </div>
       </div>
 
 
@@ -295,6 +307,7 @@
     <div style="font-size:0.85rem; color:var(--text-secondary);">少々お待ちください</div>
   </div>
 
-  <script src="/static/js/app.js?v=6"></script>
+  <script src="/static/js/db.js?v=1"></script>
+  <script src="/static/js/app.js?v=7"></script>
 </body>
 </html>
