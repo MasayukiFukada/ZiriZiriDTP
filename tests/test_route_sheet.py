@@ -95,5 +95,21 @@ class TestRouteSheet(unittest.TestCase):
         self.assertEqual(res["height"] % 2, 0)
 
 
+    def test_render_route_sheet_inline_cut_and_pause(self):
+        """Verify inline cut separators and pause points are generated every 2 spots."""
+        items = [
+            {"name": f"スポット {i}", "location": f"場所 {i}", "action": "navigate"}
+            for i in range(1, 7)
+        ]
+        img = render_route_sheet(title="6スポット旅", items=items, show_cut_line=True)
+        self.assertEqual(img.width, PRINTER_WIDTH)
+        self.assertEqual(img.height % 2, 0)
+        pause_chunks = img.info.get("pause_chunks", [])
+        # For 6 items, pause points should be after item 2 and item 4 (2 cut points)
+        self.assertEqual(len(pause_chunks), 2)
+        self.assertEqual(pause_chunks[0]["finished_spots"], "01〜02")
+        self.assertEqual(pause_chunks[1]["finished_spots"], "03〜04")
+
+
 if __name__ == "__main__":
     unittest.main()

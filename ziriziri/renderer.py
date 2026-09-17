@@ -13,20 +13,45 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from ziriziri.config import PRINTER_WIDTH, DEFAULT_FONT_PATH, FALLBACK_FONT_PATH
 
 
-def make_todo_qr(data: str, max_size: int = 115) -> Image.Image:
-    """Generate 1-bit QR code optimized for thermal receipt items."""
-    for bs in [3, 2]:
+def make_todo_qr(
+    data: str,
+    max_size: int = 220,
+    border: int = 3,
+    error_correction: int = qrcode.constants.ERROR_CORRECT_M,
+) -> Image.Image:
+    """Generate 1-bit QR code optimized for thermal receipt items.
+
+    Tries larger box sizes (from 6 down to 2) to maximize module readability.
+    Avoids NEAREST-neighbor resizing whenever possible to keep module widths uniform.
+    """
+    for bs in [6, 5, 4, 3, 2]:
         qr = qrcode.QRCode(
             version=None,
-            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            error_correction=error_correction,
             box_size=bs,
-            border=2,
+            border=border,
         )
         qr.add_data(data)
         qr.make(fit=True)
         img = qr.make_image(fill_color="black", back_color="white").convert("1")
         if img.width <= max_size:
             return img
+
+    # If still larger than max_size with bs=2, retry with lower error correction or tighter border
+    if border > 2 or error_correction != qrcode.constants.ERROR_CORRECT_L:
+        for bs in [3, 2]:
+            qr = qrcode.QRCode(
+                version=None,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=bs,
+                border=2,
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white").convert("1")
+            if img.width <= max_size:
+                return img
+
     if img.width > max_size:
         img = img.resize((max_size, max_size), Image.Resampling.NEAREST)
     return img
@@ -92,20 +117,8 @@ def image_to_base64_png(img: Image.Image) -> str:
     return f"data:image/png;base64,{b64_str}"
 
 
-def append_cut_line(img: Image.Image) -> Image.Image:
-    """Append a dashed scissors cut line to the bottom of the image for clean manual cutting."""
-    w = PRINTER_WIDTH
-    cut_h = 32
-    total_h = img.height + cut_h
-    if total_h % 2 != 0:
-        total_h += 1
-
-    new_img = Image.new("1", (w, total_h), 1)
-    new_img.paste(img, (0, 0))
-
-    draw = ImageDraw.Draw(new_img)
-    y = img.height + 16
-
+def draw_cut_line_separator(draw: ImageDraw.ImageDraw, y: int, w: int = PRINTER_WIDTH) -> None:
+    """Draw an inline dashed scissors cut line across the receipt."""
     font_cut = get_font(11)
     font_scissor = get_font(13)
 
@@ -132,6 +145,23 @@ def append_cut_line(img: Image.Image) -> Image.Image:
     # Right scissors
     draw.text((w - 12, y), "✂", font=font_scissor, fill=0, anchor="rm")
 
+
+def append_cut_line(img: Image.Image) -> Image.Image:
+    """Append a dashed scissors cut line to the bottom of the image for clean manual cutting."""
+    w = PRINTER_WIDTH
+    cut_h = 32
+    total_h = img.height + cut_h
+    if total_h % 2 != 0:
+        total_h += 1
+
+    new_img = Image.new("1", (w, total_h), 1)
+    new_img.paste(img, (0, 0))
+
+    draw = ImageDraw.Draw(new_img)
+    y = img.height + 16
+    draw_cut_line_separator(draw, y, w)
+
+    new_img.info.update(img.info)
     return new_img
 
 
@@ -165,14 +195,13 @@ def render_todo_receipt(
         qr_img = None
         if qr_data:
             try:
-                qr_img = make_todo_qr(qr_data, max_size=110)
+                qr_img = make_todo_qr(qr_data, max_size=210, border=3)
             except Exception:
                 qr_img = None
 
+        text_lines = wrap_text(text, font_item, max_width=315)
+        badge_label = ""
         if qr_img:
-            # Layout with QR on right: Left max_width 205px
-            text_lines = wrap_text(text, font_item, max_width=205)
-            badge_label = ""
             if qr_type == "url":
                 badge_label = "[URL]"
             elif qr_type == "map":
@@ -180,9 +209,9 @@ def render_todo_receipt(
             elif qr_type == "memo":
                 badge_label = "[メモ]"
 
-            text_h = len(text_lines) * 22 + (16 if badge_label else 0) + 8
-            qr_h = qr_img.height
-            item_h = max(text_h, qr_h + 12, 44)
+            text_h = len(text_lines) * 22 + (18 if badge_label else 0) + 6
+            qr_spacing = 8 + qr_img.height + 12
+            item_h = max(text_h + qr_spacing, 44)
             rendered_items.append({
                 "checked": checked,
                 "text_lines": text_lines,
@@ -192,7 +221,6 @@ def render_todo_receipt(
             })
             total_items_h += item_h
         else:
-            text_lines = wrap_text(text, font_item, max_width=315)
             item_h = max(32, len(text_lines) * 22 + 10)
             rendered_items.append({
                 "checked": checked,
@@ -259,11 +287,12 @@ def render_todo_receipt(
 
         if badge:
             draw.text((45, ty + 1), badge, font=font_sub, fill=0)
+            ty += 18
 
-        # QR code on the right side
+        # Centered large QR code below item text
         if qr_img:
-            qr_x = w - 16 - qr_img.width
-            qr_y = y + (item_h - qr_img.height) // 2
+            qr_x = (w - qr_img.width) // 2
+            qr_y = ty + 6
             img.paste(qr_img, (qr_x, qr_y))
 
             # Draw subtle dotted separator below QR items
@@ -362,26 +391,31 @@ def render_route_sheet(
         # Generate Navigation QR
         url = build_gmaps_url(location, travel_mode=travel_mode, action=action)
         try:
-            qr_img = make_todo_qr(url, max_size=104)
+            qr_img = make_todo_qr(url, max_size=200, border=3)
         except Exception:
             qr_img = None
 
         action_label = "[ナビ起動]" if action == "navigate" else "[地図詳細]"
 
-        # Text wrap
-        # Left content width: 384 - 104 (QR) - 20 (padding) - 70 (left offset) = approx 180px
-        max_text_w = 185
+        # Text wrap: text can use full width now
+        max_text_w = 295
         name_lines = wrap_text(name or location or f"スポット {idx}", font_name, max_width=max_text_w)
         note_lines = wrap_text(note, font_note, max_width=max_text_w) if note else []
 
         # Calculate height for this step
-        text_h = len(name_lines) * 22 + (len(note_lines) * 16) + 20 + 8
-        qr_h = qr_img.height if qr_img else 0
-        step_h = max(text_h, qr_h + 8, 54)
+        text_h = len(name_lines) * 22 + (len(note_lines) * 16) + 20 + 4
+        qr_h = (qr_img.height + 14) if qr_img else 0
+        step_h = text_h + qr_h
 
-        # Space for connecting connector line between items
+        # Space for connecting connector line or inline cut separator
         has_next = (idx < len(items))
-        connector_h = 16 if has_next else 0
+        is_cut_point = (idx % 2 == 0 and has_next)
+        if is_cut_point:
+            spacing_h = 36  # Inline scissors cut line separator
+        elif has_next:
+            spacing_h = 16  # Connector arrow height
+        else:
+            spacing_h = 0
 
         rendered_items.append({
             "idx": idx,
@@ -391,9 +425,10 @@ def render_route_sheet(
             "action_label": action_label,
             "qr_img": qr_img,
             "step_h": step_h,
-            "connector_h": connector_h,
+            "spacing_h": spacing_h,
+            "is_cut_point": is_cut_point,
         })
-        total_items_h += step_h + connector_h
+        total_items_h += step_h + spacing_h
 
     if not rendered_items:
         total_items_h = 44
@@ -424,6 +459,9 @@ def render_route_sheet(
     for x in range(12, w - 12, 6):
         draw.line([(x, sep_y), (x + 3, sep_y)], fill=0, width=1)
 
+    # Track pause points for printer cooling pacing
+    pause_chunks = []
+
     # Render items
     y = sep_y + 10
     if not rendered_items:
@@ -438,7 +476,8 @@ def render_route_sheet(
             action_label = itm["action_label"]
             qr_img = itm["qr_img"]
             step_h = itm["step_h"]
-            connector_h = itm["connector_h"]
+            spacing_h = itm["spacing_h"]
+            is_cut_point = itm["is_cut_point"]
 
             # Step index badge [01]
             badge_text = f"[{idx:02d}]"
@@ -463,22 +502,32 @@ def render_route_sheet(
 
             # Action tag [ナビ起動] or [地図詳細]
             draw.text((70, ty), action_label, font=font_small, fill=0)
+            ty += 18
 
-            # QR code on right
+            # Centered large QR code
             if qr_img:
-                qr_x = w - qr_img.width - 12
-                qr_y = y + (step_h - qr_img.height) // 2
+                qr_x = (w - qr_img.width) // 2
+                qr_y = ty + 4
                 img.paste(qr_img, (qr_x, qr_y))
 
             y += step_h
 
-            # Connector line/arrow between steps
-            if connector_h > 0:
+            # Inline cut separator or connector arrow between steps
+            if is_cut_point:
+                cut_y = y + spacing_h // 2
+                draw_cut_line_separator(draw, cut_y, w)
+                pause_chunks.append({
+                    "chunk": (y + spacing_h) // 2,
+                    "finished_spots": f"{idx - 1:02d}〜{idx:02d}",
+                    "next_spots": f"{idx + 1:02d}〜{min(idx + 2, len(items)):02d}",
+                })
+                y += spacing_h
+            elif spacing_h > 0:
                 cx = 54  # Align with checkbox center
-                draw.line([(cx, y - 2), (cx, y + connector_h - 4)], fill=0, width=2)
-                draw.line([(cx - 3, y + connector_h - 7), (cx, y + connector_h - 4)], fill=0, width=2)
-                draw.line([(cx + 3, y + connector_h - 7), (cx, y + connector_h - 4)], fill=0, width=2)
-                y += connector_h
+                draw.line([(cx, y - 2), (cx, y + spacing_h - 4)], fill=0, width=2)
+                draw.line([(cx - 3, y + spacing_h - 7), (cx, y + spacing_h - 4)], fill=0, width=2)
+                draw.line([(cx + 3, y + spacing_h - 7), (cx, y + spacing_h - 4)], fill=0, width=2)
+                y += spacing_h
 
     # Footer separator
     draw.line([(12, y + 6), (w - 12, y + 6)], fill=0, width=1)
@@ -494,6 +543,8 @@ def render_route_sheet(
 
     # Bottom border
     draw.rectangle([(0, total_h - 4), (w - 1, total_h - 1)], fill=0)
+
+    img.info["pause_chunks"] = pause_chunks
 
     if show_cut_line:
         img = append_cut_line(img)

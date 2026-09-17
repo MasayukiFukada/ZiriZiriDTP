@@ -148,6 +148,9 @@ class PrinterDriver:
         density: int = DEFAULT_DENSITY,
         feed_after: int = DEFAULT_FEED_AFTER,
         on_progress: Optional[Callable[[int, int], None]] = None,
+        pause_chunks: Optional[list] = None,
+        pause_duration: float = 3.5,
+        on_pause: Optional[Callable[[dict, float], None]] = None,
     ) -> bool:
         """Send raster chunks with FunnyPrint flow control (LOST packet rewind, PAUSE, and FINISHED event)."""
         async with self.lock:
@@ -229,9 +232,25 @@ class PrinterDriver:
                         pkt = pkt_print_line(cur_line, all_chunks[cur_line])
                         await client.write_gatt_char(WRITE_UUID, pkt, response=False)
                         cur_line += 1
-                        if on_progress and cur_line % 5 == 0:
-                            on_progress(cur_line, total_lines)
-                        await asyncio.sleep(0.025)
+
+                        # Check scheduled pause point for cooling
+                        pause_info = None
+                        if pause_chunks:
+                            for p in pause_chunks:
+                                p_chunk = p["chunk"] if isinstance(p, dict) else p
+                                if cur_line == p_chunk:
+                                    pause_info = p if isinstance(p, dict) else {"chunk": p}
+                                    break
+
+                        if pause_info is not None:
+                            self.log(f"Print Pacing: Cooling pause for {pause_duration}s at line {cur_line}...")
+                            if on_pause:
+                                on_pause(pause_info, pause_duration)
+                            await asyncio.sleep(pause_duration)
+                        else:
+                            if on_progress and cur_line % 5 == 0:
+                                on_progress(cur_line, total_lines)
+                            await asyncio.sleep(0.025)
 
                     # All lines dispatched, wait for printer to physically finish
                     elif cur_line >= total_lines:

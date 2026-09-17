@@ -1,10 +1,10 @@
-"""FastAPI Web Application and Printer Server for ZiriZiriDTP."""
-
+import asyncio
 import base64
+import json
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from ziriziri.config import STATIC_DIR
@@ -174,7 +174,7 @@ async def preview_route(req: RouteRequest):
 
 @app.post("/api/print/route")
 async def print_route(req: RouteRequest):
-    """Render and print travel/drive route sheet."""
+    """Render and print travel/drive route sheet with 2-spot cooling pause pacing."""
     img = render_route_sheet(
         title=req.title,
         items=[itm.model_dump() for itm in req.items],
@@ -185,13 +185,74 @@ async def print_route(req: RouteRequest):
         show_cut_line=req.show_cut_line,
     )
     chunks = pil_to_chunks(img)
-    success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
-    if not success:
-        raise HTTPException(
-            status_code=503,
-            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
-        )
-    return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
+    pause_chunks = img.info.get("pause_chunks", [])
+
+    async def event_generator():
+        event_queue = asyncio.Queue()
+
+        def on_prog(cur, total):
+            pct = int(cur / total * 100)
+            event_queue.put_nowait({
+                "type": "progress",
+                "cur": cur,
+                "total": total,
+                "percent": pct,
+                "message": f"🖨️ 印刷中… ({pct}%)",
+            })
+
+        def on_pause(p_info, duration):
+            finished = p_info.get("finished_spots", "")
+            next_sp = p_info.get("next_spots", "")
+            msg = f"☕ プリンタ冷却・休憩中 ({duration:.0f}秒)…"
+            if finished:
+                msg = f"☕ スポット [{finished}] 完了！冷却休憩中…"
+            event_queue.put_nowait({
+                "type": "pause",
+                "duration": duration,
+                "message": msg,
+            })
+
+        async def run_print():
+            try:
+                ok = await driver.print_chunks(
+                    chunks,
+                    density=req.density,
+                    feed_after=req.feed,
+                    pause_chunks=pause_chunks,
+                    pause_duration=3.5,
+                    on_progress=on_prog,
+                    on_pause=on_pause,
+                )
+                if ok:
+                    event_queue.put_nowait({"type": "done", "status": "ok", "battery": driver.battery})
+                else:
+                    event_queue.put_nowait({
+                        "type": "done",
+                        "status": "error",
+                        "detail": "プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。",
+                    })
+            except Exception as e:
+                event_queue.put_nowait({"type": "done", "status": "error", "detail": str(e)})
+
+        task = asyncio.create_task(run_print())
+        event_queue.put_nowait({
+            "type": "progress",
+            "cur": 0,
+            "total": len(chunks),
+            "percent": 0,
+            "message": "🖨️ プリンタへ接続・送信中…",
+        })
+
+        while not task.done() or not event_queue.empty():
+            try:
+                event = await asyncio.wait_for(event_queue.get(), timeout=0.2)
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+                if event.get("type") == "done":
+                    break
+            except asyncio.TimeoutError:
+                continue
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.post("/api/preview/text")

@@ -992,15 +992,69 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
       if (res && res.ok) {
-        const resData = await res.json();
-        if (resData.battery !== undefined && resData.battery !== null) {
-          updateBatteryUI(resData.battery);
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("text/event-stream")) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buf = "";
+          let finalBattery = null;
+          let isSuccess = false;
+          let errorDetail = null;
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const parts = buf.split("\n\n");
+            buf = parts.pop();
+            for (const part of parts) {
+              if (part.startsWith("data: ")) {
+                try {
+                  const ev = JSON.parse(part.slice(6));
+                  if (ev.message) {
+                    modalText.textContent = ev.message;
+                  }
+                  if (ev.battery !== undefined && ev.battery !== null) {
+                    finalBattery = ev.battery;
+                  }
+                  if (ev.type === "done") {
+                    if (ev.status === "ok") {
+                      isSuccess = true;
+                    } else {
+                      errorDetail = ev.detail || "印刷に失敗しました";
+                    }
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+
+          if (finalBattery !== null) {
+            updateBatteryUI(finalBattery);
+          }
+
+          if (isSuccess) {
+            modalText.textContent = "✨ 印刷が完了しました！";
+            setTimeout(() => {
+              printModal.classList.remove("active");
+              btnPrint.disabled = false;
+            }, 1200);
+          } else {
+            alert("印刷エラー: " + (errorDetail || "印刷が中断されました"));
+            printModal.classList.remove("active");
+            btnPrint.disabled = false;
+          }
+        } else {
+          const resData = await res.json();
+          if (resData.battery !== undefined && resData.battery !== null) {
+            updateBatteryUI(resData.battery);
+          }
+          modalText.textContent = "✨ 印刷が完了しました！";
+          setTimeout(() => {
+            printModal.classList.remove("active");
+            btnPrint.disabled = false;
+          }, 1200);
         }
-        modalText.textContent = "✨ 印刷が完了しました！";
-        setTimeout(() => {
-          printModal.classList.remove("active");
-          btnPrint.disabled = false;
-        }, 1200);
       } else {
         let errDetail = "送信に失敗しました";
         if (res) {
