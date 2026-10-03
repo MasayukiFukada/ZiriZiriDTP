@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ZiriZiriDTP - スマホ簡単サーマルプリント</title>
-  <link rel="stylesheet" href="/static/css/style.css?v=6">
+  <link rel="stylesheet" href="/static/css/style.css?v=8">
 </head>
 <body>
 
@@ -41,6 +41,7 @@
     <nav class="tabs-nav">
       <button class="tab-btn active" data-tab="todo">🛒 TODO</button>
       <button class="tab-btn" data-tab="route">🚗 ルート</button>
+      <button class="tab-btn" data-tab="wifi">📶 Wi-Fi</button>
       <button class="tab-btn" data-tab="text">📝 メモ</button>
       <button class="tab-btn" data-tab="image">🖼️ 写真</button>
       <button class="tab-btn" data-tab="test">📊 テスト</button>
@@ -158,7 +159,50 @@
         </div>
       </div>
 
-      <!-- Tab 3: Free Text & Notes -->
+      <!-- Tab 3: Wi-Fi Guest Card -->
+      <div class="tab-pane" id="pane-wifi">
+        <div class="form-group">
+          <label class="form-label">カード見出しタイトル</label>
+          <input type="text" id="wifiTitle" class="input-text" value="📶 Wi-Fi 接続カード">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">ネットワーク名 (SSID) <span style="color:var(--accent);">*</span></label>
+          <input type="text" id="wifiSsid" class="input-text" placeholder="例: MyHome-Wi-Fi, Cafe_Guest" value="ZiriZiri_Guest_5G">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">パスワード (暗号化キー)</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <input type="text" id="wifiPassword" class="input-text" placeholder="Wi-Fiパスワード（暗号化なしの場合は空欄）" value="welcome-to-ziriziri" style="padding-right:44px;">
+            <button type="button" id="btnToggleWifiPass" class="btn-clear" style="position:absolute; right:8px; padding:4px 8px; font-size:1rem;" title="パスワードの表示/伏せ字切替">👁️</button>
+          </div>
+        </div>
+
+        <div class="controls-grid">
+          <div class="form-group">
+            <label class="form-label">セキュリティ暗号化</label>
+            <select id="wifiSecurity" class="input-text">
+              <option value="WPA" selected>WPA / WPA2 / WPA3 (標準)</option>
+              <option value="WEP">WEP (レガシー)</option>
+              <option value="nopass">なし (オープン)</option>
+            </select>
+          </div>
+          <div class="form-group" style="display:flex; flex-direction:column; justify-content:center;">
+            <label style="display:flex; align-items:center; gap:8px; font-size:0.85rem; color:var(--text-primary); cursor:pointer;">
+              <input type="checkbox" id="wifiHidden" class="todo-checkbox">
+              非公開 (ステルスSSID)
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">案内・注意事項メモ</label>
+          <input type="text" id="wifiNote" class="input-text" placeholder="例: カメラでスキャンして接続 / ご自由にご利用ください" value="カメラをかざして自動接続">
+        </div>
+      </div>
+
+      <!-- Tab 4: Free Text & Notes -->
       <div class="tab-pane" id="pane-text">
         <div class="form-group">
           <div class="form-label-row">
@@ -308,6 +352,6 @@
   </div>
 
   <script src="/static/js/db.js?v=1"></script>
-  <script src="/static/js/app.js?v=7"></script>
+  <script src="/static/js/app.js?v=8"></script>
 </body>
 </html>

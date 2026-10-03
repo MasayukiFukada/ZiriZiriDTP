@@ -776,3 +776,209 @@ def render_test_chart(
     # 5. Bottom border
     draw.rectangle([(0, h - 4), (w - 1, h - 1)], fill=0)
     return img
+
+
+def format_wifi_qr_data(
+    ssid: str,
+    password: str = "",
+    security_type: str = "WPA",
+    hidden: bool = False,
+) -> str:
+    """Format Wi-Fi network credentials into standard WIFI: URI format for QR codes."""
+    def escape_val(s: str) -> str:
+        res = []
+        for ch in s:
+            if ch in ('\\', ';', ',', ':', '"'):
+                res.append('\\' + ch)
+            else:
+                res.append(ch)
+        return "".join(res)
+
+    sec = (security_type or "WPA").upper()
+    if sec not in ("WPA", "WEP", "NOPASS"):
+        sec = "WPA"
+
+    parts = [f"T:{'nopass' if sec == 'NOPASS' else sec}", f"S:{escape_val(ssid)}"]
+    if sec != "NOPASS" and password:
+        parts.append(f"P:{escape_val(password)}")
+    if hidden:
+        parts.append("H:true")
+
+    return f"WIFI:{';'.join(parts)};;"
+
+
+def draw_wifi_symbol(draw: ImageDraw.ImageDraw, cx: int, cy: int) -> None:
+    """Draw a clean vector Wi-Fi radio symbol centered at (cx, cy)."""
+    draw.arc([(cx - 11, cy - 11), (cx + 11, cy + 11)], start=225, end=315, fill=0, width=2)
+    draw.arc([(cx - 6, cy - 6), (cx + 6, cy + 6)], start=225, end=315, fill=0, width=2)
+    draw.ellipse([(cx - 2, cy + 3), (cx + 2, cy + 7)], fill=0)
+
+
+def render_wifi_card(
+    ssid: str,
+    password: str = "",
+    security_type: str = "WPA",
+    hidden: bool = False,
+    title: str = "📶 Wi-Fi 接続カード",
+    note: Optional[str] = "カメラをかざして自動接続",
+    footer_text: Optional[str] = "ZiriZiriDTP * SWS-PT1",
+    show_datetime: bool = True,
+    datetime_position: str = "footer",
+    show_cut_line: bool = True,
+) -> Image.Image:
+    """Render an elegant thermal Wi-Fi guest card with connection QR code and manual credentials."""
+    w = PRINTER_WIDTH
+    ssid = (ssid or "").strip()
+    password = (password or "").strip()
+    sec = (security_type or "WPA").upper()
+    if sec not in ("WPA", "WEP", "NOPASS"):
+        sec = "WPA"
+
+    font_title = get_font(20, bold=True)
+    font_label = get_font(12, bold=True)
+    font_value = get_font(15, bold=True)
+    font_val_mono = get_font(14)
+    font_note = get_font(13)
+    font_sub = get_font(12)
+    font_date = get_font(12)
+
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    # Generate QR Code
+    qr_data = format_wifi_qr_data(ssid=ssid, password=password, security_type=sec, hidden=hidden)
+    try:
+        qr_img = make_todo_qr(qr_data, max_size=220, border=3)
+    except Exception:
+        qr = qrcode.QRCode(box_size=4, border=3)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white").convert("1")
+        if qr_img.width > 220:
+            qr_img = qr_img.resize((220, 220), Image.Resampling.NEAREST)
+
+    # Wrap texts for credential box
+    max_val_w = w - 120
+    ssid_lines = wrap_text(ssid or "（SSID未設定）", font_value, max_width=max_val_w)
+
+    if sec == "NOPASS":
+        pass_display = "（なし / パスワード不要）"
+    else:
+        pass_display = password if password else "（未設定）"
+    pass_lines = wrap_text(pass_display, font_val_mono, max_width=max_val_w)
+
+    sec_labels = {
+        "WPA": "WPA / WPA2 / WPA3",
+        "WEP": "WEP",
+        "NOPASS": "なし (オープン)",
+    }
+    sec_display = sec_labels.get(sec, sec)
+    if hidden:
+        sec_display += " [ステルス]"
+
+    # Calculate credential box height
+    box_inner_h = 10 + (len(ssid_lines) * 20) + 6 + (len(pass_lines) * 20) + 6 + 18 + 8
+    box_h = max(box_inner_h, 80)
+
+    # Note text wrapping
+    note_lines = wrap_text(note, font_note, max_width=w - 32) if note else []
+    note_h = (len(note_lines) * 18 + 10) if note_lines else 0
+
+    # Layout heights
+    header_h = 76 if (show_datetime and datetime_position == "header") else 56
+    box_spacing = 14
+    qr_h = qr_img.height + 12
+    footer_h = 56 if (show_datetime and datetime_position == "footer") else 42
+
+    total_h = header_h + box_h + box_spacing + qr_h + note_h + footer_h
+    if total_h % 2 != 0:
+        total_h += 1
+
+    img = Image.new("1", (w, total_h), 1)
+    draw = ImageDraw.Draw(img)
+
+    # Header decorative borders
+    draw.rectangle([(0, 0), (w - 1, 4)], fill=0)
+    draw.rectangle([(0, 7), (w - 1, 9)], fill=0)
+
+    # Title
+    raw_title = (title or "Wi-Fi 接続カード").strip()
+    clean_title = raw_title.replace("📶", "").strip() or "Wi-Fi 接続カード"
+    title_bbox = draw.textbbox((0, 0), clean_title, font=font_title)
+    tw = title_bbox[2] - title_bbox[0]
+    total_w = tw + 28
+    start_x = (w - total_w) // 2
+
+    icon_cx = start_x + 10
+    draw_wifi_symbol(draw, icon_cx, 24)
+    draw.text((start_x + 26, 24), clean_title, font=font_title, fill=0, anchor="lm")
+
+    sep_y = 44
+    if show_datetime and datetime_position == "header":
+        draw.text((w // 2, 46), now_str, font=font_date, fill=0, anchor="mm")
+        sep_y = 62
+
+    # Separator dotted line
+    for x in range(12, w - 12, 6):
+        draw.line([(x, sep_y), (x + 3, sep_y)], fill=0, width=1)
+
+    # Credential Box (draw outline frame)
+    box_x0 = 14
+    box_x1 = w - 14
+    box_y0 = sep_y + 10
+    box_y1 = box_y0 + box_h
+    draw.rectangle([(box_x0, box_y0), (box_x1, box_y1)], outline=0, width=2)
+
+    # Credentials inside box
+    cy = box_y0 + 10
+
+    # SSID row
+    draw.text((box_x0 + 10, cy), "SSID:", font=font_label, fill=0)
+    vx = box_x0 + 64
+    for line in ssid_lines:
+        draw.text((vx, cy - 2), line, font=font_value, fill=0)
+        cy += 20
+    cy += 4
+
+    # Password row
+    draw.text((box_x0 + 10, cy), "PASS:", font=font_label, fill=0)
+    for line in pass_lines:
+        draw.text((vx, cy - 1), line, font=font_val_mono, fill=0)
+        cy += 20
+    cy += 4
+
+    # Security row
+    draw.text((box_x0 + 10, cy), "SEC:", font=font_label, fill=0)
+    draw.text((vx, cy), sec_display, font=font_sub, fill=0)
+
+    # QR Code
+    qr_x = (w - qr_img.width) // 2
+    qr_y = box_y1 + 10
+    img.paste(qr_img, (qr_x, qr_y))
+
+    # Note lines
+    ny = qr_y + qr_img.height + 8
+    for nline in note_lines:
+        draw.text((w // 2, ny), nline, font=font_note, fill=0, anchor="mt")
+        ny += 18
+
+    # Footer separator
+    fy_sep = ny + 6
+    draw.line([(12, fy_sep), (w - 12, fy_sep)], fill=0, width=1)
+
+    # Footer text
+    fy = fy_sep + 16
+    if show_datetime and datetime_position == "footer":
+        draw.text((w // 2, fy), now_str, font=font_date, fill=0, anchor="mm")
+        fy += 16
+
+    f_text = footer_text or "ZiriZiriDTP * SWS-PT1"
+    draw.text((w // 2, fy), f_text, font=font_sub, fill=0, anchor="mm")
+
+    # Bottom border
+    draw.rectangle([(0, total_h - 4), (w - 1, total_h - 1)], fill=0)
+
+    if show_cut_line:
+        img = append_cut_line(img)
+
+    return img
+

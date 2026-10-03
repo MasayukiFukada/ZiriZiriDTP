@@ -12,6 +12,7 @@ from ziriziri.driver import PrinterDriver
 from ziriziri.renderer import (
     render_todo_receipt,
     render_route_sheet,
+    render_wifi_card,
     render_free_text,
     render_image_dither,
     render_test_chart,
@@ -100,6 +101,22 @@ class TestChartRequest(BaseModel):
     show_cut_line: bool = True
 
 
+class WifiRequest(BaseModel):
+    ssid: str
+    password: Optional[str] = ""
+    security_type: str = "WPA"  # "WPA", "WEP", "nopass"
+    hidden: bool = False
+    title: str = "📶 Wi-Fi 接続カード"
+    note: Optional[str] = "カメラをかざして自動接続"
+    footer: Optional[str] = "ZiriZiriDTP * SWS-PT1"
+    show_datetime: bool = True
+    datetime_position: str = "footer"  # "header" or "footer"
+    show_cut_line: bool = True
+    density: int = 1
+    feed: int = 40
+
+
+
 # ─────────────────────────────────────────────────────────────
 # Endpoints
 # ─────────────────────────────────────────────────────────────
@@ -110,7 +127,14 @@ async def root():
     index_file = STATIC_DIR / "index.html"
     if not index_file.exists():
         return JSONResponse({"status": "Frontend not ready yet."})
-    return FileResponse(index_file)
+    return FileResponse(
+        index_file,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 @app.get("/api/status")
@@ -253,6 +277,49 @@ async def print_route(req: RouteRequest):
                 continue
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@app.post("/api/preview/wifi")
+async def preview_wifi(req: WifiRequest):
+    """Generate preview image for Wi-Fi guest card."""
+    img = render_wifi_card(
+        ssid=req.ssid,
+        password=req.password or "",
+        security_type=req.security_type,
+        hidden=req.hidden,
+        title=req.title,
+        note=req.note,
+        footer_text=req.footer,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
+        show_cut_line=req.show_cut_line,
+    )
+    return {"preview": image_to_base64_png(img), "height": img.height}
+
+
+@app.post("/api/print/wifi")
+async def print_wifi(req: WifiRequest):
+    """Render and print Wi-Fi guest card."""
+    img = render_wifi_card(
+        ssid=req.ssid,
+        password=req.password or "",
+        security_type=req.security_type,
+        hidden=req.hidden,
+        title=req.title,
+        note=req.note,
+        footer_text=req.footer,
+        show_datetime=req.show_datetime,
+        datetime_position=req.datetime_position,
+        show_cut_line=req.show_cut_line,
+    )
+    chunks = pil_to_chunks(img)
+    success = await driver.print_chunks(chunks, density=req.density, feed_after=req.feed)
+    if not success:
+        raise HTTPException(
+            status_code=503,
+            detail="プリンタと通信できませんでした。プリンタの電源が入っているか確認してください。"
+        )
+    return {"status": "ok", "chunks": len(chunks), "battery": driver.battery}
 
 
 @app.post("/api/preview/text")

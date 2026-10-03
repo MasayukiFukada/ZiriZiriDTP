@@ -102,6 +102,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     },
   };
 
+  // Wi-Fi elements
+  const wifiTitle = document.getElementById("wifiTitle");
+  const wifiSsid = document.getElementById("wifiSsid");
+  const wifiPassword = document.getElementById("wifiPassword");
+  const btnToggleWifiPass = document.getElementById("btnToggleWifiPass");
+  const wifiSecurity = document.getElementById("wifiSecurity");
+  const wifiHidden = document.getElementById("wifiHidden");
+  const wifiNote = document.getElementById("wifiNote");
+
   // Text elements
   const freeText = document.getElementById("freeText");
   const textSize = document.getElementById("textSize");
@@ -163,6 +172,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   const savedMemoBold = await dbGet("ziriziri_memo_bold");
   if (savedMemoBold !== null && textBold) {
     textBold.checked = savedMemoBold === true || savedMemoBold === "true";
+  }
+
+  // Wi-Fi Settings
+  const savedWifiTitle = await dbGet("ziriziri_wifi_title");
+  if (savedWifiTitle !== null && wifiTitle) {
+    wifiTitle.value = savedWifiTitle;
+  }
+  const savedWifiSsid = await dbGet("ziriziri_wifi_ssid");
+  if (savedWifiSsid !== null && wifiSsid) {
+    wifiSsid.value = savedWifiSsid;
+  }
+  const savedWifiPass = await dbGet("ziriziri_wifi_password");
+  if (savedWifiPass !== null && wifiPassword) {
+    wifiPassword.value = savedWifiPass;
+  }
+  const savedWifiSec = await dbGet("ziriziri_wifi_security");
+  if (savedWifiSec !== null && wifiSecurity) {
+    wifiSecurity.value = savedWifiSec;
+    if (savedWifiSec === "nopass" && wifiPassword) {
+      wifiPassword.disabled = true;
+      wifiPassword.placeholder = "（暗号化なしのためパスワード不要）";
+    }
+  }
+  const savedWifiHidden = await dbGet("ziriziri_wifi_hidden");
+  if (savedWifiHidden !== null && wifiHidden) {
+    wifiHidden.checked = savedWifiHidden === true || savedWifiHidden === "true";
+  }
+  const savedWifiNote = await dbGet("ziriziri_wifi_note");
+  if (savedWifiNote !== null && wifiNote) {
+    wifiNote.value = savedWifiNote;
   }
 
   // Print options
@@ -704,6 +743,63 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ─────────────────────────────────────────────────────────
+  // Wi-Fi Controls Events
+  // ─────────────────────────────────────────────────────────
+  if (wifiTitle) {
+    wifiTitle.addEventListener("input", () => {
+      dbSet("ziriziri_wifi_title", wifiTitle.value);
+      requestPreview();
+    });
+  }
+  if (wifiSsid) {
+    wifiSsid.addEventListener("input", () => {
+      dbSet("ziriziri_wifi_ssid", wifiSsid.value);
+      requestPreview();
+    });
+  }
+  if (wifiPassword) {
+    wifiPassword.addEventListener("input", () => {
+      dbSet("ziriziri_wifi_password", wifiPassword.value);
+      requestPreview();
+    });
+  }
+  if (btnToggleWifiPass && wifiPassword) {
+    btnToggleWifiPass.addEventListener("click", () => {
+      const isPass = wifiPassword.type === "password";
+      wifiPassword.type = isPass ? "text" : "password";
+      btnToggleWifiPass.textContent = isPass ? "👁️" : "🔒";
+      btnToggleWifiPass.title = isPass ? "パスワードを伏せ字にする" : "パスワードを表示する";
+    });
+  }
+  if (wifiSecurity) {
+    wifiSecurity.addEventListener("change", () => {
+      const isNopass = wifiSecurity.value === "nopass";
+      if (wifiPassword) {
+        wifiPassword.disabled = isNopass;
+        if (isNopass) {
+          wifiPassword.placeholder = "（暗号化なしのためパスワード不要）";
+        } else {
+          wifiPassword.placeholder = "Wi-Fiパスワード（暗号化なしの場合は空欄）";
+        }
+      }
+      dbSet("ziriziri_wifi_security", wifiSecurity.value);
+      requestPreview();
+    });
+  }
+  if (wifiHidden) {
+    wifiHidden.addEventListener("change", () => {
+      dbSet("ziriziri_wifi_hidden", wifiHidden.checked);
+      requestPreview();
+    });
+  }
+  if (wifiNote) {
+    wifiNote.addEventListener("input", () => {
+      dbSet("ziriziri_wifi_note", wifiNote.value);
+      requestPreview();
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
   // Text & Image Controls Events
   // ─────────────────────────────────────────────────────────
   freeText.addEventListener("input", () => {
@@ -840,6 +936,26 @@ document.addEventListener("DOMContentLoaded", async () => {
         const data = await res.json();
         if (data.preview) previewImg.src = data.preview;
 
+      } else if (currentTab === "wifi") {
+        const payload = {
+          title: wifiTitle ? (wifiTitle.value || "📶 Wi-Fi 接続カード") : "📶 Wi-Fi 接続カード",
+          ssid: wifiSsid ? wifiSsid.value : "",
+          password: wifiPassword ? wifiPassword.value : "",
+          security_type: wifiSecurity ? wifiSecurity.value : "WPA",
+          hidden: wifiHidden ? wifiHidden.checked : false,
+          note: wifiNote ? wifiNote.value : "",
+          show_datetime: showDate,
+          datetime_position: datePos,
+          show_cut_line: showCut,
+        };
+        const res = await fetch("/api/preview/wifi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.preview) previewImg.src = data.preview;
+
       } else if (currentTab === "text") {
         const payload = {
           text: freeText.value || " ",
@@ -934,6 +1050,24 @@ document.addEventListener("DOMContentLoaded", async () => {
             title: routeTitle ? (routeTitle.value || "🚗 ドライブルート") : "🚗 ドライブルート",
             items: routeItems,
             travel_mode: routeMode,
+            show_datetime: showDate,
+            datetime_position: datePos,
+            show_cut_line: showCut,
+            density,
+            feed,
+          }),
+        });
+      } else if (currentTab === "wifi") {
+        res = await fetch("/api/print/wifi", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: wifiTitle ? (wifiTitle.value || "📶 Wi-Fi 接続カード") : "📶 Wi-Fi 接続カード",
+            ssid: wifiSsid ? wifiSsid.value : "",
+            password: wifiPassword ? wifiPassword.value : "",
+            security_type: wifiSecurity ? wifiSecurity.value : "WPA",
+            hidden: wifiHidden ? wifiHidden.checked : false,
+            note: wifiNote ? wifiNote.value : "",
             show_datetime: showDate,
             datetime_position: datePos,
             show_cut_line: showCut,

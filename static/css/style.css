@@ -187,11 +187,19 @@ body {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tabs-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 10px 8px;
+  flex: 1 0 auto;
+  min-width: fit-content;
+  padding: 10px 10px;
   border: none;
   background: transparent;
   color: var(--text-secondary);
@@ -204,6 +212,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .tab-btn.active {
